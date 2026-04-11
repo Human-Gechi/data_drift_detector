@@ -11,3 +11,5 @@ jinja2
 watchdog
 tabulate
 pytest
+google-cloud-bigquery
+mysqlclient

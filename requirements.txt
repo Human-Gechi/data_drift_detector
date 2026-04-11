@@ -1,0 +1,13 @@
+pandas
+numpy
+scipy
+matplotlib
+seaborn
+sqlalchemy
+psycopg2-binary
+openpyxl
+pyarrow
+jinja2
+watchdog
+tabulate
+pytest

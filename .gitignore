@@ -1,1 +1,5 @@
 venv
+drift.log
+data.json
+Product.csv
+__pycache__

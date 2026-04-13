@@ -1,7 +1,8 @@
-from typing import Optional, Dict, List
+from typing import Optional, List
 from dataclasses import dataclass
 from google.cloud import bigquery
 from google.oauth2 import service_account
+import pandas as pd
 
 class DatabaseConnectionError(Exception):
     pass
@@ -23,13 +24,18 @@ class BigQueryConn:
             raise DatabaseConnectionError(f"File not found: {e}")
         except Exception as e:
             raise DatabaseConnectionError(f"BigQuery connection failed: {e}")
-            S
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if hasattr(self, 'client'):
             self.client.close()
 
-    def group_columns_by_type(self, client, dataset: str, table_name: str) -> Dict[str, List[str]]:
+    def group_columns_by_type(self, client, dataset: str, table_name: str):
+        numerical_types = {
+            "integer", "bigint", "smallint", "decimal", "numeric", "real", "double precision", "float","number"
+        }
+        text_types = {"character varying", "varchar", "character", "char", "text", "citext", "string"}
+        date_types = {"date", "timestamp","timestamptz", "time", "timestamp_ntz"}
+        bool_types = {"boolean", "bool"}
         table_ref = f"{client.project}.{dataset}.{table_name}"
         table = client.get_table(table_ref)
         groups = {
@@ -40,36 +46,27 @@ class BigQueryConn:
         }
         for field in table.schema:
             ftype = field.field_type.lower()
-            if ftype in {"integer", "float", "numeric", "bignumeric"}:
+            if ftype in numerical_types:
                 groups["numerical"].append(field.name)
-            elif ftype in {"string", "bytes"}:
+            elif ftype in text_types:
                 groups["text"].append(field.name)
-            elif ftype in {"date", "datetime", "timestamp", "time"}:
+            elif ftype in date_types:
                 groups["date"].append(field.name)
-            elif ftype == "bool":
+            elif ftype in bool_types:
                 groups["bool"].append(field.name)
         return groups
 
-    def fetch_grouped_data(self, client, dataset: str, table_name: str, limit: int = 1000):
-        groups = self.group_columns_by_type(client, dataset, table_name)
-        data = {}
-        table_ref = f"{client.project}.{dataset}.{table_name}"
-        for group, columns in groups.items():
-            if columns:
-                col_str = ", ".join([f"`{col}`" for col in columns])
-                query = f"SELECT {col_str} FROM `{table_ref}` LIMIT {limit}"
-                query_job = client.query(query)
-                data[group] = query_job.to_dataframe()
-            else:
-                data[group] = None
-        return data
-
-try:
-    with BigQueryConn(project="project", credentials_path="path/to/creds.json") as client:
-        data = client.fetch_grouped_data(client, "ataset", "table")
-        print(data["numerical"])
-        print(data["text"])
-        print(data["date"])
-        print(data["bool"])
-except DatabaseConnectionError as e:
-    print(f"{e}")
+    def iter_grouped_data(self, client, datasets: List[str], table_names: List[str], limit: int = 1000):
+        for dataset in datasets:
+            for table_name in table_names:
+                groups = self.group_columns_by_type(client, dataset, table_name)
+                table_ref = f"{client.project}.{dataset}.{table_name}"
+                for group, columns in groups.items():
+                    if columns:
+                        col_str = ", ".join([f"`{col}`" for col in columns])
+                        query = f"SELECT {col_str} FROM `{table_ref}` LIMIT {limit}"
+                        query_job = client.query(query)
+                        df = query_job.to_dataframe()
+                        yield (dataset, table_name, group, df)
+                    else:
+                        yield (dataset, table_name, group, None)

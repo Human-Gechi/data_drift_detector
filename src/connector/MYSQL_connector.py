@@ -2,8 +2,7 @@ from dataclasses import dataclass
 import MySQLdb
 import pandas as pd
 from log import get_ingest_logger
-
-data_logger = get_ingest_logger()
+from collections import defaultdict
 
 class DatabaseConnectionError(Exception):
     pass
@@ -35,12 +34,41 @@ class MySQLConnector:
         if hasattr(self, 'conn'):
             self.conn.close()
 
+    def get_table_info(self, conn, table_names=None,schemas=None):
+        if table_names is None:
+            raise ValueError("table_names must be provided")
+        if isinstance(table_names, str):
+            table_names = [table_names]
+
+        if schemas is None:
+            schemas = ["public"]
+        if isinstance(schemas, str):
+            schemas = [schemas]
+
+        results = {}
+        cursor = conn.cursor()
+        for schema in schemas:
+            for table_name in table_names:
+                cursor.execute(
+                    """
+                    SELECT column_name, data_type
+                    FROM information_schema.columns
+                    WHERE table_schema = %s AND table_name = %s
+                    ORDER BY ordinal_position
+                    """,
+                    (schema, table_name)
+                )
+                columns = cursor.fetchall()
+                results[(schema, table_name)] = columns
+        cursor.close()
+        return results
+
     def group_tables_by_type(self, conn, table_names=None, schemas=None):
         numerical_types = {
-            "integer", "bigint", "smallint", "decimal", "numeric", "real", "double precision", "float"
+            "integer", "bigint", "smallint", "decimal", "numeric", "real", "double precision", "float","number"
         }
         text_types = {"character varying", "varchar", "character", "char", "text", "citext"}
-        date_types = {"date", "timestamp","timestamptz", "time"}
+        date_types = {"date", "timestamp","timestamptz", "time", "timestamp_ntz"}
         bool_types = {"boolean", "bool"}
 
         table_info = self.get_table_info(conn, table_names, schemas)
@@ -66,35 +94,62 @@ class MySQLConnector:
             grouped[(schema, table)] = groups
         return grouped
 
-    def get_group_data(self, conn, table_names=None, schemas=None, batch_size=50000):
-        groups = self.group_tables_by_type(conn, table_names, schemas)
-        flat_data = {}
+    def table_exists(self, conn, schema, table):
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 1 FROM information_schema.tables
+            WHERE table_schema = %s AND table_name = %s
+        """, (schema, table))
+        exists = cursor.fetchone() is not None
+        cursor.close()
+        return exists
 
-        for (schema, table), group_cols in groups.items():
-            table_ref = f'"{schema}"."{table}"'
-            for group, columns in group_cols.items():
-                if not columns:
-                    flat_data[f"{schema}.{table}.{group}"] = pd.DataFrame()
-                    continue
+    def get_group_data_dynamic(self, conn, schemas=None, table_names=None, batch_size=50000):
+        if schemas is None:
+            schemas = ["PUBLIC"]
+        if isinstance(schemas, str):
+            schemas = [schemas]
+        if table_names and isinstance(table_names, str):
+            table_names = [table_names]
 
-                col_str = ", ".join([f'"{col}"' for col in columns])
-                query = f'SELECT {col_str} FROM {table_ref}'
+        valid_tables = set()
+        for schema in schemas:
+            if table_names:
+                for table in table_names:
+                    if self.table_exists(conn, schema, table):
+                        valid_tables.add((schema, table))
+            else:
 
-                def fetch_batches():
-                    offset = 0
-                    while True:
-                        batch_query = f'{query} LIMIT {batch_size} OFFSET {offset}'
-                        cur = conn.cursor()
-                        cur.execute(batch_query)
-                        rows = cur.fetchall()
-                        cur.close()
-                        if not rows:
-                            break
-                        yield pd.DataFrame(rows, columns=columns)
-                        offset += batch_size
+                tables = self.get_tables_in_schemas(conn, [schema])
+                for sch, tbl in tables:
+                    valid_tables.add((sch, tbl))
 
-                combined_df = pd.concat(fetch_batches(), ignore_index=True)
-                flat_data[f"{schema}.{table}.{group}"] = combined_df
+        schema_table_map = defaultdict(list)
+        for schema, table in valid_tables:
+            schema_table_map[schema].append(table)
 
-        return flat_data
+        for schema, tables in schema_table_map.items():
+            groups = self.group_tables_by_type(conn, table_names=tables, schemas=[schema])
+            for (sch, table), group_cols in groups.items():
+                for group, columns in group_cols.items():
+                    if not columns:
+                        continue
+                    key = f"{sch}.{table}.{group}"
+                    col_str = ", ".join(f'"{col}"' for col in columns)
+                    query = f'SELECT {col_str} FROM "{sch}"."{table}"'
 
+                    def fetch_batches():
+                        offset = 0
+                        while True:
+                            batch_query = f'{query} LIMIT {batch_size} OFFSET {offset}'
+                            cur = conn.cursor()
+                            cur.execute(batch_query)
+                            rows = cur.fetchall()
+                            cur.close()
+                            if not rows:
+                                break
+                            yield pd.DataFrame(rows, columns=columns)
+                            offset += batch_size
+
+                    group_df = pd.concat(fetch_batches(), ignore_index=True)
+                    yield key, group_df

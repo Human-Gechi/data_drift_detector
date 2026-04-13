@@ -68,15 +68,13 @@ class MySQLConnector:
 
     def get_group_data(self, conn, table_names=None, schemas=None, batch_size=50000):
         groups = self.group_tables_by_type(conn, table_names, schemas)
-        data = {}
+        flat_data = {}
 
         for (schema, table), group_cols in groups.items():
             table_ref = f'"{schema}"."{table}"'
-            data[(schema, table)] = {}
-
             for group, columns in group_cols.items():
                 if not columns:
-                    data[(schema, table)][group] = None
+                    flat_data[f"{schema}.{table}.{group}"] = pd.DataFrame()
                     continue
 
                 col_str = ", ".join([f'"{col}"' for col in columns])
@@ -90,19 +88,13 @@ class MySQLConnector:
                         cur.execute(batch_query)
                         rows = cur.fetchall()
                         cur.close()
-
                         if not rows:
                             break
-
                         yield pd.DataFrame(rows, columns=columns)
                         offset += batch_size
-                        data_logger.info(f"Fetched batch for {table_ref}, offset: {offset} for {group} columns")
 
                 combined_df = pd.concat(fetch_batches(), ignore_index=True)
+                flat_data[f"{schema}.{table}.{group}"] = combined_df
 
-                if combined_df.empty:
-                    data[(schema, table)][group] = pd.DataFrame(columns=columns)
-                else:
-                    data[(schema, table)][group] = combined_df
+        return flat_data
 
-        return data

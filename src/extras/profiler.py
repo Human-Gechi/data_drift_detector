@@ -56,9 +56,8 @@ class SummaryStats:
                     stat_dict["min_length"] = non_null.map(len).min()
                     stat_dict["max_length"] = non_null.map(len).max()
                 stats[col] = stat_dict
-                
-        return json.dumps(stats, indent=3, default=str)
 
+        return json.dumps(stats, indent=3, default=str)
 
 
 

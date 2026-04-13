@@ -4,6 +4,7 @@ from pathlib import Path
 import pandas as pd
 from typing import Optional, List
 from log import get_ingest_logger
+import hashlib
 
 data_logger = get_ingest_logger()
 class DataFileLoader:
@@ -108,18 +109,21 @@ class DataFileLoader:
 
         try:
             df = loader(file_path)
-            data_logger.info(f"✅ Loaded: {file_path}")
-            data_logger.info(f"Shape: {df.shape}")
-            data_logger.info(f"Columns: {list(df.columns[:5])}...")
+            df = df.convert_dtypes()
             return df
         except Exception as e:
             data_logger.error(f"❌ Error loading {file_path}: {e}")
             return None
+    def get_file_hash(self, file_path):
+        sha256_hash = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
 
 #loader = DataFileLoader(search_dirs=[r"C:\Users\HP\data_lineage_visualizer"])
 
-#df = loader.load("Products.c")
-
+#df = loader.load("Product.csv")
 #all_files = loader.find_all()
 #print(f"Found {len(all_files)} data files")
 

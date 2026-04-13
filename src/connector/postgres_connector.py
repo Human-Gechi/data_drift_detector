@@ -105,7 +105,51 @@ class PostgresConn:
         cursor.close()
         return exists
 
-    def get_group_data_dynamic(self, conn, schemas=None, table_names=None, batch_size=50000):
+    def get_tables_in_schemas(self, conn, schemas):
+        if isinstance(schemas, str):
+            schemas = [schemas]
+        tables = []
+        cursor = conn.cursor()
+        for schema in schemas:
+            cursor.execute(
+                """
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = %s AND table_type = 'BASE TABLE'
+                """,
+                (schema,)
+            )
+            tables_in_schema = [row[0] for row in cursor.fetchall()]
+            tables.extend([(schema, t) for t in tables_in_schema])
+        cursor.close()
+        return tables
+
+    def get_table_hashes(self, conn, table_names=None, schemas=None):
+        if table_names is None:
+            raise ValueError("table_names must be provided")
+        if schemas is None:
+            schemas = ["public"]
+        if isinstance(table_names, str):
+            table_names = [table_names]
+        if isinstance(schemas, str):
+            schemas = [schemas]
+
+        results = {}
+        cursor = conn.cursor()
+        for schema in schemas:
+            for table in table_names:
+                if self.table_exists(conn, schema, table):
+                    try:
+                        query = f'SELECT SUM(hashtext(t::text)) FROM (SELECT * FROM "{schema}"."{table}") AS t'
+                        cursor.execute(query)
+                        hash_value = cursor.fetchone()[0]
+                        results[(schema, table)] = hash_value
+                    except Exception as e:
+                        results[(schema, table)] = None
+        cursor.close()
+        return results
+
+    def get_group_data(self, conn, schemas=None, table_names=None, batch_size=50000):
         if schemas is None:
             schemas = ["PUBLIC"]
         if isinstance(schemas, str):
@@ -153,3 +197,4 @@ class PostgresConn:
 
                     group_df = pd.concat(fetch_batches(), ignore_index=True)
                     yield key, group_df
+

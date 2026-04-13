@@ -29,6 +29,21 @@ class BigQueryConn:
         if hasattr(self, 'client'):
             self.client.close()
 
+    def get_table_hashes(self, client, datasets: List[str], table_names: List[str]):
+        results = {}
+        for dataset in datasets:
+                for table_name in table_names:
+                    table_ref = f"{client.project}.{dataset}.{table_name}"
+                    try:
+                        query_job = client.query(f"SELECT BIT_XOR(FARM_FINGERPRINT(TO_JSON_STRING(t))) FROM {table_ref} AS t")
+                        result = list(query_job.result())
+                        hash_value = result[0][0] if result else None
+                        results[(dataset, table_name)] = hash_value
+                    except Exception as e:
+                        print(f"Error fetching hash for {table_name}: {e}")
+                        results[(dataset, table_name)] = None
+        return results
+
     def group_columns_by_type(self, client, dataset: str, table_name: str):
         numerical_types = {
             "integer", "bigint", "smallint", "decimal", "numeric", "real", "double precision", "float","number"

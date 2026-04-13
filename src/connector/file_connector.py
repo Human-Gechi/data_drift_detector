@@ -5,7 +5,7 @@ import pandas as pd
 from typing import Optional, List
 from log import get_ingest_logger
 import hashlib
-
+from src.extras.profiler import SummaryStats
 data_logger = get_ingest_logger()
 class DataFileLoader:
     DEFAULT_SEARCH_DIRS = [
@@ -105,16 +105,21 @@ class DataFileLoader:
             data_logger.error(f"❌File not found: {filename}")
             data_logger.error(f"❌Searched in: {self.search_dirs}")
             return None
-
-
+        
         try:
             df = loader(file_path)
-            df = df.convert_dtypes()
+            for col in df.select_dtypes(include=['object','string']).columns:
+                date_keywords = ['date', 'time', 'timestamp','created', 'updated']
+                if any(key in col.lower() for key in date_keywords):
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+                else:
+                    df = df.convert_dtypes()
             return df
         except Exception as e:
             data_logger.error(f"❌ Error loading {file_path}: {e}")
             return None
-    def get_file_hash(self, file_path):
+
+    def get_file_hashes(self, file_path):
         sha256_hash = hashlib.sha256()
         with open(file_path, "rb") as f:
             for byte_block in iter(lambda: f.read(4096), b""):

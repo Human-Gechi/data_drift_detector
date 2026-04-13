@@ -4,19 +4,26 @@ import json
 class SummaryStats:
 
     @staticmethod
-    def profile_numeric(df: pd.DataFrame) -> dict:
+    def profile_numeric(df: pd.DataFrame) -> str:
         stats = {}
         for col in df.columns:
+            if pd.api.types.is_datetime64_any_dtype(df[col]):
+                continue
+            if pd.api.types.is_string_dtype(df[col]):
+                continue
+
             series = pd.to_numeric(df[col], errors="coerce")
-            if pd.api.types.is_numeric_dtype(series):
+
+            if pd.api.types.is_numeric_dtype(series) and not series.dropna().empty:
                 stats[col] = {
-                    "mean": series.mean(),
-                    "std": series.std(),
-                    "min": series.min(),
-                    "max": series.max(),
-                    "nulls": series.isnull().sum()
+                    "mean": float(series.mean()),
+                    "std": float(series.std()),
+                    "min": float(series.min()),
+                    "max": float(series.max()),
+                    "null_counts": int(df[col].isnull().sum())
                 }
-        return json.dumps(stats, indent=3, default=str)
+
+        return json.dumps(stats, indent=3)
 
     @staticmethod
     def profile_bool(df: pd.DataFrame) -> dict:
@@ -24,9 +31,9 @@ class SummaryStats:
         for col in df.columns:
             if pd.api.types.is_bool_dtype(df[col]):
                 stats[col] = {
-                    "nulls": df[col].isnull().sum(),
-                    "unique": df[col].nunique(),
-                    "value_counts": df[col].value_counts().to_dict()
+                    "nulls": int(df[col].isnull().sum()),
+                    "unique_values": int(df[col].nunique()),
+                    "value_counts": int(df[col].value_counts().to_dict())
                 }
         return json.dumps(stats, indent=3, default=str)
 
@@ -35,29 +42,50 @@ class SummaryStats:
     def profile_date(df: pd.DataFrame) -> dict:
         stats = {}
         for col in df.columns:
-            if pd.api.types.is_datetime64_any_dtype(df[col]):
+            if pd.api.types.is_datetime64_any_dtype(df[col]) or isinstance(df[col], pd.DatetimeTZDtype):
                 stats[col] = {
                     "min": df[col].min(),
                     "max": df[col].max(),
-                    "nulls": df[col].isnull().sum(),
-                    "value_counts": df[col].value_counts().to_dict()
+                    "null_counts": int(df[col].isnull().sum())
                 }
         return json.dumps(stats, indent=3, default=str)
 
 
-    @staticmethod
-    def profile_text(df: pd.DataFrame) -> dict:
+    def profile_text(df: pd.DataFrame) -> str:
         stats = {}
         for col in df.columns:
             if pd.api.types.is_string_dtype(df[col]):
-                non_null = df[col].dropna()
-                stat_dict = {"nulls": df[col].isnull().sum()}
-                if not non_null.empty:
-                    stat_dict["min_length"] = non_null.map(len).min()
-                    stat_dict["max_length"] = non_null.map(len).max()
-                stats[col] = stat_dict
+                series = df[col].dropna()
+                total_rows = len(series)
 
-        return json.dumps(stats, indent=3, default=str)
+                if total_rows == 0:
+                    stats[col] = {"status": "empty"}
+                    continue
+
+                unique_count = series.nunique()
+                unique_ratio = unique_count / total_rows
+                avg_length = series.str.len().mean()
+
+                if unique_ratio < 0.20 or unique_count < 25:
+                    detected_type = "categorical"
+                elif avg_length > 30:
+                    detected_type = "unstructured_text"
+                else:
+                    detected_type = "categorical_high_cardinality"
+
+
+                stats[col] = {
+                    "detected_type": detected_type,
+                    "nulls": int(df[col].isnull().sum()),
+                    "unique_values": unique_count,
+                    "avg_character_length": round(avg_length, 2),
+                    "sample_values": series.head(3).tolist()
+                }
+
+                if detected_type.startswith("categorical"):
+                    stats[col]["top_labels"] = series.value_counts().head(5).to_dict()
+
+        return json.dumps(stats, indent=3)
 
 
 

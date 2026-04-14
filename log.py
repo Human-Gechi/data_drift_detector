@@ -34,5 +34,3 @@ def get_ingest_logger():
     ingest_log_file_path.touch(exist_ok=True)
 
     return _build_logger("data_logger", ingest_log_file_path)
-
-get_ingest_logger()

@@ -3,3 +3,4 @@ drift.log
 data.json
 Product.csv
 __pycache__
+hashes.jsonl

@@ -46,11 +46,19 @@ class BigQueryConn:
 
     def group_columns_by_type(self, client, dataset: str, table_name: str):
         numerical_types = {
-            "integer", "bigint", "smallint", "decimal", "numeric", "real", "double precision", "float","number"
+            "int64", "int", "smallint", "integer", "bigint", "tinyint", "byteint",
+            "numeric", "decimal", "bignumeric", "bigdecimal",
+            "float64", "float"
         }
-        text_types = {"character varying", "varchar", "character", "char", "text", "citext", "string"}
-        date_types = {"date", "timestamp","timestamptz", "time", "timestamp_ntz"}
-        bool_types = {"boolean", "bool"}
+        text_types = text_types = {
+            "string"
+        }
+        date_types = date_types = {
+            "date", "timestamp", "datetime", "time"
+        }
+        bool_types = {
+            "boolean", "bool"
+        }
         table_ref = f"{client.project}.{dataset}.{table_name}"
         table = client.get_table(table_ref)
         groups = {

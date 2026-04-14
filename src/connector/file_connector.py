@@ -1,136 +1,178 @@
-import pandas as pd
-
-from pathlib import Path
-import pandas as pd
-from typing import Optional, List
-from log import get_ingest_logger
 import hashlib
-from src.extras.profiler import SummaryStats
+import os
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Iterator, List, Optional, Union
+import pandas as pd
+from log import get_ingest_logger
+
 data_logger = get_ingest_logger()
+
 class DataFileLoader:
+
     DEFAULT_SEARCH_DIRS = [
-        str(Path.home() / "Downloads"),
-        str(Path.home() / "Documents"),
-        str(Path.home() / "OneDrive/Desktop"),
-        str(Path.home() / "Desktop"),
-        str(Path.cwd())
+        "~/Downloads",
+        "~/Documents",
+        "~/Desktop",
+        "~/OneDrive/Desktop"
+        "."
     ]
 
-
     SUPPORTED_EXTENSIONS = {
-        '.csv': pd.read_csv,
-        '.json': pd.read_json,
-        '.xlsx': pd.read_excel,
-        '.xls': pd.read_excel,
-        '.parquet': pd.read_parquet
+        ".csv": pd.read_csv,
+        ".jsonl": lambda f: pd.read_json(f, lines=True),
+        ".json": pd.read_json,
+        ".xlsx": pd.read_excel,
+        ".xls": pd.read_excel,
+        ".parquet": pd.read_parquet,
     }
 
-    def __init__(self, search_dirs: Optional[List[str]] = None):
-        self.search_dirs = search_dirs or self.DEFAULT_SEARCH_DIRS
-        self._cache = {}
+    BANNED_DIRS = {
+        "venv", ".venv", "env", ".git", "__pycache__",
+        "node_modules", "$recycle.bin", "system volume information",
+        "appdata", "windows", "program files", "program files (x86)",
+        "windowsapps", "microsoft shared", "common files",
+    }
 
+    def __init__(self, search_dirs: Optional[Union[str, List[str]]] = None) -> None:
+        if search_dirs is None:
+            dirs = self.DEFAULT_SEARCH_DIRS
+        elif isinstance(search_dirs, str):
+            dirs = [search_dirs]
+        else:
+            dirs = search_dirs
 
-    def is_virtualenv_folder(self, folder_path) -> bool:
-        folder = Path(folder_path)
-        if (folder.joinpath('Lib').is_dir() and
-            folder.joinpath('Scripts').is_dir() and
-            folder.joinpath('share').is_dir() and
-            folder.joinpath('pyvenv.cfg').is_file()):
-            return True
+        self.search_dirs = self._expand_dirs(dirs)
+        self._file_cache: Dict[str, Path] = {}
+        self._walk_cache: Dict[str, List[Path]] = {}
 
-        if (folder.joinpath('bin').is_dir() and
-            folder.joinpath('pyvenv.cfg').is_file()):
-            return True
-        return False
-
-    def _walk_skip_venv(self, root: Path):
-        try:
-            for entry in root.iterdir():
-                if entry.is_dir():
-                    if self.is_virtualenv_folder(str(entry)):
-                        continue
-                    yield from self._walk_skip_venv(entry)
+    def _expand_dirs(self, dirs: List[str]) -> List[str]:
+        expanded = []
+        for d in dirs:
+            try:
+                p = Path(d).expanduser().resolve()
+                if p.is_dir():
+                    expanded.append(str(p))
                 else:
-                    yield entry
-        except PermissionError:
-            pass
+                    data_logger.warning(f"Skipping non‑existent directory: {d} → {p}")
+            except Exception as e:
+                data_logger.warning(f"Invalid directory '{d}': {e}")
+        return expanded
+
+    def is_virtualenv_folder(self, folder_path: Union[str, Path]) -> bool:
+        return (Path(folder_path) / "pyvenv.cfg").is_file()
+
+    def _should_skip_dir(self, dir_name: str) -> bool:
+        if dir_name.startswith("."):
+            return True
+        return dir_name.lower() in self.BANNED_DIRS
+
+    def _walk_directory(self, root_path: Path) -> Iterator[Path]:
+        root_str = str(root_path)
+        if root_str in self._walk_cache:
+            yield from self._walk_cache[root_str]
+            return
+
+        discovered = []
+        try:
+            with os.scandir(root_path) as it:
+                for entry in it:
+                    if entry.is_symlink():
+                        continue
+                    if entry.is_dir():
+                        if self._should_skip_dir(entry.name):
+                            continue
+                        if self.is_virtualenv_folder(entry.path):
+                            continue
+                        yield from self._walk_directory(Path(entry.path))
+                    else:
+                        ext = os.path.splitext(entry.name)[1].lower()
+                        if ext in self.SUPPORTED_EXTENSIONS:
+                            file_path = Path(entry.path)
+                            discovered.append(file_path)
+                            yield file_path
+        except (OSError, PermissionError) as e:
+            data_logger.debug(f"Cannot scan {root_path}: {e}")
+
+        self._walk_cache[root_str] = discovered
 
     def find(self, filename: str) -> Optional[Path]:
-        """Find just one file"""
-        if filename in self._cache:
-            return self._cache[filename]
+        if filename in self._file_cache:
+            return self._file_cache[filename]
 
         for search_dir in self.search_dirs:
-            path = Path(search_dir).expanduser().resolve()
-            if not path.exists() or self.is_virtualenv_folder(str(path)):
-                continue
-
-            for file_path in self._walk_skip_venv(path):
+            for file_path in self._walk_directory(Path(search_dir)):
                 if file_path.name == filename:
-                    self._cache[filename] = file_path
+                    self._file_cache[filename] = file_path
                     return file_path
-
         return None
 
     def find_all(self, extensions: Optional[List[str]] = None) -> List[Path]:
-        """Find all files in a specific directory"""
         if extensions is None:
             extensions = list(self.SUPPORTED_EXTENSIONS.keys())
+        extensions = [ext if ext.startswith('.') else f'.{ext}' for ext in extensions]
+        extensions = [ext.lower() for ext in extensions]
 
-        files = []
+        all_files = []
         for search_dir in self.search_dirs:
-            path = Path(search_dir).expanduser().resolve()
-            if not path.exists() or self.is_virtualenv_folder(str(path)):
-                continue
-
-            for file_path in self._walk_skip_venv(path):
-                if any(file_path.suffix == ext for ext in extensions):
-                    files.append(file_path)
-
-        return files
+            for file_path in self._walk_directory(Path(search_dir)):
+                if file_path.suffix.lower() in extensions:
+                    all_files.append(file_path)
+        return all_files
 
     def load(self, filename: str) -> Optional[pd.DataFrame]:
-        """Find and load a file"""
-        ext = Path(filename).suffix.lower()
-        loader = self.SUPPORTED_EXTENSIONS.get(ext)
-
-        if not loader:
-            data_logger.warning(f"⚠️ Unsupported file type: {ext}")
-            data_logger.warning(f"⚠️ Supported: {list(self.SUPPORTED_EXTENSIONS.keys())}")
-            return None
-
         file_path = self.find(filename)
-
         if not file_path:
-            data_logger.error(f"❌File not found: {filename}")
-            data_logger.error(f"❌Searched in: {self.search_dirs}")
+            data_logger.error(f"File not found: {filename}")
             return None
-        
+
+        ext = file_path.suffix.lower()
+        loader = self.SUPPORTED_EXTENSIONS.get(ext)
+        if not loader:
+            data_logger.warning(f"Unsupported file type: {ext}")
+            return None
+
         try:
             df = loader(file_path)
-            for col in df.select_dtypes(include=['object','string']).columns:
-                date_keywords = ['date', 'time', 'timestamp','created', 'updated']
-                if any(key in col.lower() for key in date_keywords):
-                    df[col] = pd.to_datetime(df[col], errors='coerce')
-                else:
-                    df = df.convert_dtypes()
+            for col in df.select_dtypes(include=["object", "string"]).columns:
+                if any(k in col.lower() for k in ["date", "time", "timestamp", "created", "updated"]):
+                    df[col] = pd.to_datetime(df[col], errors="coerce")
+            df = df.convert_dtypes()
+            data_logger.info(f"Loaded {file_path} ({df.shape[0]} rows, {df.shape[1]} cols)")
             return df
         except Exception as e:
-            data_logger.error(f"❌ Error loading {file_path}: {e}")
+            data_logger.error(f"Error loading {file_path}: {e}")
             return None
 
-    def get_file_hashes(self, file_path):
-        sha256_hash = hashlib.sha256()
-        with open(file_path, "rb") as f:
-            for byte_block in iter(lambda: f.read(4096), b""):
-                sha256_hash.update(byte_block)
-        return sha256_hash.hexdigest()
+    def get_file_hashes(self, file_path: Optional[Union[str, Path]] = None) -> Dict[str, Dict[str, str]]:
+        hashes = {}
+        if file_path is not None:
+            path_obj = Path(file_path)
+            if not path_obj.is_absolute():
+                found = self.find(str(file_path))
+                if not found:
+                    data_logger.error(f"File not found: {file_path}")
+                    return {}
+                files_to_process = [found]
+            else:
+                files_to_process = [path_obj]
+        else:
+            files_to_process = self.find_all()
 
-#loader = DataFileLoader(search_dirs=[r"C:\Users\HP\data_lineage_visualizer"])
+        for fpath in files_to_process:
+            try:
+                sha256 = hashlib.sha256()
+                with open(fpath, "rb") as f:
+                    for chunk in iter(lambda: f.read(8192), b""):
+                        sha256.update(chunk)
+                hashes[str(fpath)] = {
+                    "hash": sha256.hexdigest(),
+                    "checked_at": datetime.now().isoformat(),
+                }
+            except Exception as e:
+                data_logger.warning(f"Could not hash {fpath}: {e}")
+        return hashes
 
-#df = loader.load("Product.csv")
-#all_files = loader.find_all()
-#print(f"Found {len(all_files)} data files")
-
-#for file in all_files:
-    #df = loader.load(file.name)
+    def clear_cache(self) -> None:
+        self._file_cache.clear()
+        self._walk_cache.clear()

@@ -14,6 +14,7 @@ class SummaryStats:
         for col in numeric_df.columns:
             series = numeric_df[col]
             stats[col] = {
+                "detected_type": "numerical",
                 "mean": float(series.mean()),
                 "std": float(series.std()) if len(series) > 1 else 0.0,
                 "min": float(series.min()),
@@ -33,6 +34,7 @@ class SummaryStats:
         for col in bool_df.columns:
             series = bool_df[col]
             stats[col] = {
+                "detected_type": "boolean",
                 "nulls": int(series.isnull().sum()),
                 "unique_values": int(series.nunique()),
                 "value_counts": int(series.value_counts().to_dict()),
@@ -52,6 +54,7 @@ class SummaryStats:
         for col in date_df.columns:
             series = date_df[col]
             stats[col] = {
+                "detected_type": "date/time",
                 "min": series.min(),
                 "max": series.max(),
                 "null_counts": int(series.isnull().sum()),

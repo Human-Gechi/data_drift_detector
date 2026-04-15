@@ -1,11 +1,14 @@
-from typing import Optional, List
 from dataclasses import dataclass
+from typing import List, Optional
+
+import pandas as pd
 from google.cloud import bigquery
 from google.oauth2 import service_account
-import pandas as pd
+
 
 class DatabaseConnectionError(Exception):
     pass
+
 
 @dataclass
 class BigQueryConn:
@@ -15,7 +18,9 @@ class BigQueryConn:
     def __enter__(self):
         try:
             if self.credentials_path:
-                credentials = service_account.Credentials.from_service_account_file(self.credentials_path)
+                credentials = service_account.Credentials.from_service_account_file(
+                    self.credentials_path
+                )
                 self.client = bigquery.Client(project=self.project, credentials=credentials)
             else:
                 self.client = bigquery.Client(project=self.project)
@@ -26,47 +31,48 @@ class BigQueryConn:
             raise DatabaseConnectionError(f"BigQuery connection failed: {e}")
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if hasattr(self, 'client'):
+        if hasattr(self, "client"):
             self.client.close()
 
     def get_table_hashes(self, client, datasets: List[str], table_names: List[str]):
         results = {}
         for dataset in datasets:
-                for table_name in table_names:
-                    table_ref = f"{client.project}.{dataset}.{table_name}"
-                    try:
-                        query_job = client.query(f"SELECT BIT_XOR(FARM_FINGERPRINT(TO_JSON_STRING(t))) FROM {table_ref} AS t")
-                        result = list(query_job.result())
-                        hash_value = result[0][0] if result else None
-                        results[(dataset, table_name)] = hash_value
-                    except Exception as e:
-                        print(f"Error fetching hash for {table_name}: {e}")
-                        results[(dataset, table_name)] = None
+            for table_name in table_names:
+                table_ref = f"{client.project}.{dataset}.{table_name}"
+                try:
+                    query_job = client.query(
+                        f"SELECT BIT_XOR(FARM_FINGERPRINT(TO_JSON_STRING(t))) FROM {table_ref} AS t"
+                    )
+                    result = list(query_job.result())
+                    hash_value = result[0][0] if result else None
+                    results[(dataset, table_name)] = hash_value
+                except Exception as e:
+                    print(f"Error fetching hash for {table_name}: {e}")
+                    results[(dataset, table_name)] = None
         return results
 
     def group_columns_by_type(self, client, dataset: str, table_name: str):
         numerical_types = {
-            "int64", "int", "smallint", "integer", "bigint", "tinyint", "byteint",
-            "numeric", "decimal", "bignumeric", "bigdecimal",
-            "float64", "float"
+            "int64",
+            "int",
+            "smallint",
+            "integer",
+            "bigint",
+            "tinyint",
+            "byteint",
+            "numeric",
+            "decimal",
+            "bignumeric",
+            "bigdecimal",
+            "float64",
+            "float",
         }
-        text_types = text_types = {
-            "string"
-        }
-        date_types = date_types = {
-            "date", "timestamp", "datetime", "time"
-        }
-        bool_types = {
-            "boolean", "bool"
-        }
+        text_types = text_types = {"string"}
+        date_types = date_types = {"date", "timestamp", "datetime", "time"}
+        bool_types = {"boolean", "bool"}
         table_ref = f"{client.project}.{dataset}.{table_name}"
         table = client.get_table(table_ref)
-        groups = {
-            "numerical": [],
-            "text": [],
-            "date": [],
-            "bool": []
-        }
+        groups = {"numerical": [], "text": [], "date": [], "bool": []}
         for field in table.schema:
             ftype = field.field_type.lower()
             if ftype in numerical_types:
@@ -79,7 +85,9 @@ class BigQueryConn:
                 groups["bool"].append(field.name)
         return groups
 
-    def iter_grouped_data(self, client, datasets: List[str], table_names: List[str], limit: int = 1000):
+    def iter_grouped_data(
+        self, client, datasets: List[str], table_names: List[str], limit: int = 1000
+    ):
         for dataset in datasets:
             for table_name in table_names:
                 groups = self.group_columns_by_type(client, dataset, table_name)

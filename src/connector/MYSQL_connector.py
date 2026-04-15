@@ -1,9 +1,10 @@
+from collections import defaultdict
 from dataclasses import dataclass
+
 import MySQLdb
 import pandas as pd
+
 from log import get_ingest_logger
-from collections import defaultdict
-from datetime import datetime
 
 PG_TO_PANDAS_MAP = {
     "integer": "Int64",
@@ -19,12 +20,14 @@ PG_TO_PANDAS_MAP = {
     "text": "string",
     "date": "datetime64[ns]",
     "timestamp": "datetime64[ns]",
-    "timestamptz": "datetime64[ns]"
+    "timestamptz": "datetime64[ns]",
 }
 data_logger = get_ingest_logger()
 
+
 class DatabaseConnectionError(Exception):
     pass
+
 
 @dataclass
 class MySQLConnector:
@@ -37,20 +40,21 @@ class MySQLConnector:
     def __enter__(self):
         try:
             self.conn = MySQLdb.connect(
-                host=self.host,
-                port=self.port,
-                user=self.user,
-                password=self.password,
-                db=self.db
+                host=self.host, port=self.port, user=self.user, password=self.password, db=self.db
             )
             return self.conn
-        except (MySQLdb.OperationalError, MySQLdb.ProgrammingError, MySQLdb.InterfaceError, MySQLdb.DatabaseError) as e:
+        except (
+            MySQLdb.OperationalError,
+            MySQLdb.ProgrammingError,
+            MySQLdb.InterfaceError,
+            MySQLdb.DatabaseError,
+        ) as e:
             raise DatabaseConnectionError(f"MySQL connection failed: {e}") from e
         except Exception as e:
             raise DatabaseConnectionError(f"An unexpected error occurred: {e}") from e
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if hasattr(self, 'conn'):
+        if hasattr(self, "conn"):
             try:
                 self.conn.close()
             except Exception as e:
@@ -80,14 +84,21 @@ class MySQLConnector:
                             WHERE table_schema = %s AND table_name = %s
                             ORDER BY ordinal_position
                             """,
-                            (schema, table_name)
+                            (schema, table_name),
                         )
                         columns = cursor.fetchall()
                         results[(schema, table_name)] = columns
-                    except (MySQLdb.OperationalError, MySQLdb.ProgrammingError, MySQLdb.InterfaceError, MySQLdb.DatabaseError) as e:
+                    except (
+                        MySQLdb.OperationalError,
+                        MySQLdb.ProgrammingError,
+                        MySQLdb.InterfaceError,
+                        MySQLdb.DatabaseError,
+                    ) as e:
                         raise DatabaseConnectionError(f"MySQL error in get_table_info: {e}") from e
                     except Exception as e:
-                        raise DatabaseConnectionError(f"Unexpected error in get_table_info: {e}") from e
+                        raise DatabaseConnectionError(
+                            f"Unexpected error in get_table_info: {e}"
+                        ) from e
             cursor.close()
         except Exception as e:
             raise DatabaseConnectionError(f"Error in get_table_info: {e}") from e
@@ -95,35 +106,41 @@ class MySQLConnector:
 
     def group_tables_by_type(self, conn, table_names=None, schemas=None):
         numerical_types = {
-            "int", "integer", "bigint", "smallint", "tinyint",
-            "mediumint", "decimal", "numeric", "float", "double",
-            "double precision", "real"
+            "int",
+            "integer",
+            "bigint",
+            "smallint",
+            "tinyint",
+            "mediumint",
+            "decimal",
+            "numeric",
+            "float",
+            "double",
+            "double precision",
+            "real",
         }
 
         text_types = {
-            "char", "varchar", "text", "tinytext",
-            "mediumtext", "longtext", "enum", "set"
+            "char",
+            "varchar",
+            "text",
+            "tinytext",
+            "mediumtext",
+            "longtext",
+            "enum",
+            "set",
         }
 
-        date_types = {
-            "date", "datetime", "timestamp", "time", "year"
-        }
+        date_types = {"date", "datetime", "timestamp", "time", "year"}
 
-        bool_types = {
-            "tinyint", "bool", "boolean"
-        }
+        bool_types = {"tinyint", "bool", "boolean"}
 
         try:
             table_info = self.get_table_info(conn, table_names, schemas)
             grouped = {}
 
             for (schema, table), columns in table_info.items():
-                groups = {
-                    "numerical": [],
-                    "text": [],
-                    "date": [],
-                    "bool": []
-                }
+                groups = {"numerical": [], "text": [], "date": [], "bool": []}
                 for col, dtype in columns:
                     dtype_l = dtype.lower()
                     if dtype_l in numerical_types:
@@ -142,14 +159,22 @@ class MySQLConnector:
     def table_exists(self, conn, schema, table):
         try:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT 1 FROM information_schema.tables
                 WHERE table_schema = %s AND table_name = %s
-            """, (schema, table))
+            """,
+                (schema, table),
+            )
             exists = cursor.fetchone() is not None
             cursor.close()
             return exists
-        except (MySQLdb.OperationalError, MySQLdb.ProgrammingError, MySQLdb.InterfaceError, MySQLdb.DatabaseError) as e:
+        except (
+            MySQLdb.OperationalError,
+            MySQLdb.ProgrammingError,
+            MySQLdb.InterfaceError,
+            MySQLdb.DatabaseError,
+        ) as e:
             raise DatabaseConnectionError(f"MySQL error in table_exists: {e}") from e
         except Exception as e:
             raise DatabaseConnectionError(f"Unexpected error in table_exists: {e}") from e
@@ -168,20 +193,29 @@ class MySQLConnector:
                         FROM information_schema.tables
                         WHERE table_schema = %s AND table_type = 'BASE TABLE'
                         """,
-                        (schema,)
+                        (schema,),
                     )
                     tables_in_schema = [row[0] for row in cursor.fetchall()]
                     tables.extend([(schema, t) for t in tables_in_schema])
-                except (MySQLdb.OperationalError, MySQLdb.ProgrammingError, MySQLdb.InterfaceError, MySQLdb.DatabaseError) as e:
-                    raise DatabaseConnectionError(f"MySQL error in get_tables_in_schemas: {e}") from e
+                except (
+                    MySQLdb.OperationalError,
+                    MySQLdb.ProgrammingError,
+                    MySQLdb.InterfaceError,
+                    MySQLdb.DatabaseError,
+                ) as e:
+                    raise DatabaseConnectionError(
+                        f"MySQL error in get_tables_in_schemas: {e}"
+                    ) from e
                 except Exception as e:
-                    raise DatabaseConnectionError(f"Unexpected error in get_tables_in_schemas: {e}") from e
+                    raise DatabaseConnectionError(
+                        f"Unexpected error in get_tables_in_schemas: {e}"
+                    ) from e
             cursor.close()
         except Exception as e:
             raise DatabaseConnectionError(f"Error in get_tables_in_schemas: {e}") from e
         return tables
 
-    def get_table_hashes(self, conn, table_names=None, schemas=None, batch_size=5000):
+    def get_table_hashes(self, conn, table_names=None, schemas=None):
         if table_names is None:
             raise ValueError("table_names must be provided")
         if schemas is None:
@@ -198,28 +232,27 @@ class MySQLConnector:
                 for table in table_names:
                     try:
                         if self.table_exists(conn, schema, table):
-                            offset, total_hash = 0, 0
-                            while True:
-                                query = f"""SELECT SUM(hashtext(t::text)) FROM 
-                                (
-                                SELECT * FROM "{schema}"."{table}" LIMIT {batch_size} OFFSET {offset}
-                                ) AS t"""
-                                cursor.execute(query)
-                                hash_value = cursor.fetchone()[0]
-                                if hash_value is None:
-                                    break
-                                total_hash += hash_value
-                                offset += batch_size
-                                results[(schema, table)] ={
-                                "hash": total_hash,
-                                "created_at": datetime.now().isoformat()
-                                }
+                            query = f"CHECKSUM TABLE {schema}.{table};"
+                            cursor.execute(query)
+                            hash_value = cursor.fetchone()[1]
+                            if hash_value is None:
+                                break
+                            results[(schema, table)] = hash_value
                         else:
                             results[(schema, table)] = None
-                    except (MySQLdb.OperationalError, MySQLdb.ProgrammingError, MySQLdb.InterfaceError, MySQLdb.DatabaseError) as e:
-                        raise DatabaseConnectionError(f"MySQL error in get_table_hashes: {e}") from e
+                    except (
+                        MySQLdb.OperationalError,
+                        MySQLdb.ProgrammingError,
+                        MySQLdb.InterfaceError,
+                        MySQLdb.DatabaseError,
+                    ) as e:
+                        raise DatabaseConnectionError(
+                            f"MySQL error in get_table_hashes: {e}"
+                        ) from e
                     except Exception as e:
-                        raise DatabaseConnectionError(f"Unexpected error in get_table_hashes: {e}") from e
+                        raise DatabaseConnectionError(
+                            f"Unexpected error in get_table_hashes: {e}"
+                        ) from e
             cursor.close()
         except Exception as e:
             raise DatabaseConnectionError(f"Error in get_table_hashes: {e}") from e
@@ -261,7 +294,8 @@ class MySQLConnector:
                     }
 
                     for group, columns in group_cols.items():
-                        if not columns: continue
+                        if not columns:
+                            continue
 
                         key = f"{sch}.{table}.{group}"
                         col_str = ", ".join(f'"{col}"' for col in columns)
@@ -269,19 +303,30 @@ class MySQLConnector:
                         def fetch_batches():
                             offset = 0
                             while True:
-                                batch_query = f'SELECT {col_str} FROM "{sch}"."{table}" LIMIT {batch_size} OFFSET {offset}'
+                                batch_query = f"""SELECT {col_str} FROM "{sch}"."{table}" 
+                                LIMIT {batch_size} OFFSET {offset}"""
                                 cur = conn.cursor()
                                 try:
                                     cur.execute(batch_query)
                                     rows = cur.fetchall()
-                                except (MySQLdb.OperationalError, MySQLdb.ProgrammingError, MySQLdb.InterfaceError, MySQLdb.DatabaseError) as e:
-                                    raise DatabaseConnectionError(f"MySQL error in get_group_data: {e}") from e
+                                except (
+                                    MySQLdb.OperationalError,
+                                    MySQLdb.ProgrammingError,
+                                    MySQLdb.InterfaceError,
+                                    MySQLdb.DatabaseError,
+                                ) as e:
+                                    raise DatabaseConnectionError(
+                                        f"MySQL error in get_group_data: {e}"
+                                    ) from e
                                 except Exception as e:
-                                    raise DatabaseConnectionError(f"Unexpected error in get_group_data: {e}") from e
+                                    raise DatabaseConnectionError(
+                                        f"Unexpected error in get_group_data: {e}"
+                                    ) from e
                                 finally:
                                     cur.close()
 
-                                if not rows: break
+                                if not rows:
+                                    break
 
                                 batch_df = pd.DataFrame(rows, columns=columns)
 
@@ -294,7 +339,8 @@ class MySQLConnector:
                             group_df = pd.concat(fetch_batches(), ignore_index=True)
                             yield key, group_df
                         except Exception as e:
-                            raise DatabaseConnectionError(f"Error in get_group_data for {key}: {e}") from e
+                            raise DatabaseConnectionError(
+                                f"Error in get_group_data for {key}: {e}"
+                            ) from e
         except Exception as e:
             raise DatabaseConnectionError(f"Error in get_group_data: {e}") from e
-

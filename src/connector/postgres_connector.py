@@ -1,9 +1,10 @@
-import psycopg2
-from dataclasses import dataclass
-import pandas as pd
 from collections import defaultdict
+from dataclasses import dataclass
+
+import pandas as pd
+import psycopg2
+
 from log import get_ingest_logger
-from datetime import datetime
 
 data_logger = get_ingest_logger()
 
@@ -20,10 +21,13 @@ PG_TO_PANDAS_MAP = {
     "text": "string",
     "date": "datetime64[ns]",
     "timestamp": "datetime64[ns]",
-    "timestamptz": "datetime64[ns]"
+    "timestamptz": "datetime64[ns]",
 }
+
+
 class DatabaseConnectionError(Exception):
     pass
+
 
 @dataclass
 class PostgresConn:
@@ -40,22 +44,27 @@ class PostgresConn:
                 port=self.port,
                 user=self.user,
                 password=self.password,
-                dbname=self.db
+                dbname=self.db,
             )
             return self.conn
-        except (psycopg2.OperationalError, psycopg2.ProgrammingError, psycopg2.InterfaceError, psycopg2.DatabaseError) as e:
+        except (
+            psycopg2.OperationalError,
+            psycopg2.ProgrammingError,
+            psycopg2.InterfaceError,
+            psycopg2.DatabaseError,
+        ) as e:
             raise DatabaseConnectionError(f"PostgreSQL connection failed: {e}") from e
         except Exception as e:
             raise DatabaseConnectionError(f"An unexpected error occurred: {e}") from e
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if hasattr(self, 'conn'):
+        if hasattr(self, "conn"):
             try:
                 self.conn.close()
             except Exception as e:
                 pass
 
-    def get_table_info(self, conn, table_names=None,schemas=None):
+    def get_table_info(self, conn, table_names=None, schemas=None):
         if table_names is None:
             raise ValueError("table_names must be provided")
         if isinstance(table_names, str):
@@ -79,14 +88,23 @@ class PostgresConn:
                             WHERE table_schema = %s AND table_name = %s
                             ORDER BY ordinal_position
                             """,
-                            (schema, table_name)
+                            (schema, table_name),
                         )
                         columns = cursor.fetchall()
                         results[(schema, table_name)] = columns
-                    except (psycopg2.OperationalError, psycopg2.ProgrammingError, psycopg2.InterfaceError, psycopg2.DatabaseError) as e:
-                        raise DatabaseConnectionError(f"psycopg2 error in get_table_info: {e}") from e
+                    except (
+                        psycopg2.OperationalError,
+                        psycopg2.ProgrammingError,
+                        psycopg2.InterfaceError,
+                        psycopg2.DatabaseError,
+                    ) as e:
+                        raise DatabaseConnectionError(
+                            f"psycopg2 error in get_table_info: {e}"
+                        ) from e
                     except Exception as e:
-                        raise DatabaseConnectionError(f"Unexpected error in get_table_info occurred: {e}") from e
+                        raise DatabaseConnectionError(
+                            f"Unexpected error in get_table_info occurred: {e}"
+                        ) from e
             cursor.close()
         except Exception as e:
             raise DatabaseConnectionError(f"Error in get_table_info: {e}") from e
@@ -94,31 +112,25 @@ class PostgresConn:
 
     def group_tables_by_type(self, conn, table_names=None, schemas=None):
         numerical_types = {
-            "integer", "bigint", "smallint", "decimal", "numeric",
-            "real", "double precision", "float"
+            "integer",
+            "bigint",
+            "smallint",
+            "decimal",
+            "numeric",
+            "real",
+            "double precision",
+            "float",
         }
-        text_types = {
-            "character varying", "varchar", "character", "char",
-            "text", "citext"
-        }
-        date_types = {
-            "date", "timestamp", "timestamptz", "time"
-        }
-        bool_types = {
-            "boolean", "bool"
-        }
+        text_types = {"character varying", "varchar", "character", "char", "text", "citext"}
+        date_types = {"date", "timestamp", "timestamptz", "time"}
+        bool_types = {"boolean", "bool"}
 
         try:
             table_info = self.get_table_info(conn, table_names, schemas)
             grouped = {}
 
             for (schema, table), columns in table_info.items():
-                groups = {
-                    "numerical": [],
-                    "text": [],
-                    "date": [],
-                    "bool": []
-                }
+                groups = {"numerical": [], "text": [], "date": [], "bool": []}
                 for col, dtype in columns:
                     dtype_l = dtype.lower()
                     if dtype_l in numerical_types:
@@ -137,14 +149,22 @@ class PostgresConn:
     def table_exists(self, conn, schema, table):
         try:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT 1 FROM information_schema.tables
                 WHERE table_schema = %s AND table_name = %s
-            """, (schema, table))
+            """,
+                (schema, table),
+            )
             exists = cursor.fetchone() is not None
             cursor.close()
             return exists
-        except (psycopg2.OperationalError, psycopg2.ProgrammingError, psycopg2.InterfaceError, psycopg2.DatabaseError) as e:
+        except (
+            psycopg2.OperationalError,
+            psycopg2.ProgrammingError,
+            psycopg2.InterfaceError,
+            psycopg2.DatabaseError,
+        ) as e:
             raise DatabaseConnectionError(f"psycopg2 error in table_exists: {e}") from e
         except Exception as e:
             raise DatabaseConnectionError(f"Unexpected error in table_exists: {e}") from e
@@ -163,14 +183,23 @@ class PostgresConn:
                         FROM information_schema.tables
                         WHERE table_schema = %s AND table_type = 'BASE TABLE'
                         """,
-                        (schema,)
+                        (schema,),
                     )
                     tables_in_schema = [row[0] for row in cursor.fetchall()]
                     tables.extend([(schema, t) for t in tables_in_schema])
-                except (psycopg2.OperationalError, psycopg2.ProgrammingError, psycopg2.InterfaceError, psycopg2.DatabaseError) as e:
-                    raise DatabaseConnectionError(f"psycopg2 error in get_tables_in_schemas: {e}") from e
+                except (
+                    psycopg2.OperationalError,
+                    psycopg2.ProgrammingError,
+                    psycopg2.InterfaceError,
+                    psycopg2.DatabaseError,
+                ) as e:
+                    raise DatabaseConnectionError(
+                        f"psycopg2 error in get_tables_in_schemas: {e}"
+                    ) from e
                 except Exception as e:
-                    raise DatabaseConnectionError(f"Unexpected error in get_tables_in_schemas: {e}") from e
+                    raise DatabaseConnectionError(
+                        f"Unexpected error in get_tables_in_schemas: {e}"
+                    ) from e
             cursor.close()
         except Exception as e:
             raise DatabaseConnectionError(f"Error in get_tables_in_schemas:{e}") from e
@@ -197,24 +226,31 @@ class PostgresConn:
                             while True:
                                 query = f"""SELECT SUM(hashtext(t::text)) FROM 
                                 (
-                                SELECT * FROM "{schema}"."{table}" LIMIT {batch_size} OFFSET {offset}
-                                ) AS t"""
+                                SELECT * FROM "{schema}"."{table}" 
+                                LIMIT {batch_size} OFFSET {offset}
+                                ) AS t;"""
                                 cursor.execute(query)
                                 hash_value = cursor.fetchone()[0]
                                 if hash_value is None:
                                     break
                                 total_hash += hash_value
                                 offset += batch_size
-                            results[(schema, table)] ={
-                                "hash": total_hash,
-                                "created_at": datetime.now().isoformat()
-                            }
+                            results[(schema, table)] = total_hash
                         else:
                             results[(schema, table)] = None
-                    except (psycopg2.OperationalError, psycopg2.ProgrammingError, psycopg2.InterfaceError, psycopg2.DatabaseError) as e:
-                        raise DatabaseConnectionError(f"psycopg2 error in get_table_hashes: {e}") from e
+                    except (
+                        psycopg2.OperationalError,
+                        psycopg2.ProgrammingError,
+                        psycopg2.InterfaceError,
+                        psycopg2.DatabaseError,
+                    ) as e:
+                        raise DatabaseConnectionError(
+                            f"psycopg2 error in get_table_hashes: {e}"
+                        ) from e
                     except Exception as e:
-                        raise DatabaseConnectionError(f"Unexpected error in get_table_hashes: {e}") from e
+                        raise DatabaseConnectionError(
+                            f"Unexpected error in get_table_hashes: {e}"
+                        ) from e
             cursor.close()
         except Exception as e:
             raise DatabaseConnectionError(f"Error in get_table_hashes: {e}") from e
@@ -256,7 +292,8 @@ class PostgresConn:
                     }
 
                     for group, columns in group_cols.items():
-                        if not columns: continue
+                        if not columns:
+                            continue
 
                         key = f"{sch}.{table}.{group}"
                         col_str = ", ".join(f'"{col}"' for col in columns)
@@ -264,19 +301,30 @@ class PostgresConn:
                         def fetch_batches():
                             offset = 0
                             while True:
-                                batch_query = f'SELECT {col_str} FROM "{sch}"."{table}" LIMIT {batch_size} OFFSET {offset}'
+                                batch_query = f"""SELECT {col_str} FROM "{sch}"."{table}" 
+                                LIMIT {batch_size} OFFSET {offset}"""
                                 cur = conn.cursor()
                                 try:
                                     cur.execute(batch_query)
                                     rows = cur.fetchall()
-                                except (psycopg2.OperationalError, psycopg2.ProgrammingError, psycopg2.InterfaceError, psycopg2.DatabaseError) as e:
-                                    raise DatabaseConnectionError(f"psycopg2 error in get_group_data: {e}") from e
+                                except (
+                                    psycopg2.OperationalError,
+                                    psycopg2.ProgrammingError,
+                                    psycopg2.InterfaceError,
+                                    psycopg2.DatabaseError,
+                                ) as e:
+                                    raise DatabaseConnectionError(
+                                        f"psycopg2 error in get_group_data: {e}"
+                                    ) from e
                                 except Exception as e:
-                                    raise DatabaseConnectionError(f"Unexpected error in get_group_data: {e}") from e
+                                    raise DatabaseConnectionError(
+                                        f"Unexpected error in get_group_data: {e}"
+                                    ) from e
                                 finally:
                                     cur.close()
 
-                                if not rows: break
+                                if not rows:
+                                    break
 
                                 batch_df = pd.DataFrame(rows, columns=columns)
 
@@ -289,6 +337,8 @@ class PostgresConn:
                             group_df = pd.concat(fetch_batches(), ignore_index=True)
                             yield key, group_df
                         except Exception as e:
-                            raise DatabaseConnectionError(f"Error in get_group_data for {key}") from e
+                            raise DatabaseConnectionError(
+                                f"Error in get_group_data for {key}"
+                            ) from e
         except Exception as e:
             raise DatabaseConnectionError(f"Error in get_group_data: {e}") from e

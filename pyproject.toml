@@ -1,0 +1,44 @@
+[project]
+name = "data_drift_detector"
+version = "0.1.0"
+description = "Data drift detector for datasets"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Human-Gechi", email = "okoliogechi74@gmail.com" }
+]
+dependencies = [
+    "pandas==3.0.2",
+    "scipy==1.17.1",
+    "psycopg2-binary==2.9.11",
+    "pytest==9.0.3",
+    "google-cloud-bigquery== 3.41.0",
+    "mysqlclient==2.2.8",
+    "snowflake-connector-python==4.4.0",
+    "google-auth==2.49.2",
+    "ruff==0.15.10"
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.15.10"
+]
+
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+exclude = [
+    ".gitignore",
+    "README.md",
+    "venv"
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+[tool.ruff.lint]
+select = ["E", "I"]

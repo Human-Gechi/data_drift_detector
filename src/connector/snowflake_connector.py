@@ -1,12 +1,14 @@
-from typing import Optional
-import snowflake.connector
-from dataclasses import dataclass
-import pandas as pd
 from collections import defaultdict
-from datetime import datetime
+from dataclasses import dataclass
+from typing import Optional
+
+import pandas as pd
+import snowflake.connector
+
 
 class DatabaseConnectionError(Exception):
     pass
+
 
 PG_TO_PANDAS_MAP = {
     "integer": "Int64",
@@ -26,8 +28,9 @@ PG_TO_PANDAS_MAP = {
     "timestamptz": "datetime64[ns]",
     "timestamp_ntz": "datetime64[ns]",
     "time": "datetime64[ns]",
-    "number": "Float64"
+    "number": "Float64",
 }
+
 
 @dataclass
 class SnowflakeConn:
@@ -35,8 +38,8 @@ class SnowflakeConn:
     password: str
     account: str
     database: str
-    schema: str
-    warehouse: Optional[str] = None
+    warehouse: str
+    schema: Optional[str] = None
     role: Optional[str] = None
 
     def __enter__(self):
@@ -46,10 +49,10 @@ class SnowflakeConn:
                 "password": self.password,
                 "account": self.account,
                 "database": self.database,
-                "schema": self.schema
+                "warehouse": self.warehouse,
             }
-            if self.warehouse:
-                conn_params["warehouse"] = self.warehouse
+            if self.schema:
+                conn_params["schema"] = self.schema
             if self.role:
                 conn_params["role"] = self.role
             self.conn = snowflake.connector.connect(**conn_params)
@@ -58,7 +61,7 @@ class SnowflakeConn:
             raise DatabaseConnectionError(f"Snowflake connection failed: {e}") from e
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if hasattr(self, 'conn'):
+        if hasattr(self, "conn"):
             try:
                 self.conn.close()
             except Exception as e:
@@ -82,18 +85,19 @@ class SnowflakeConn:
                 for table_name in table_names:
                     try:
                         cursor.execute(
-                            """
+                            f"""
                             SELECT column_name, data_type
                             FROM information_schema.columns
-                            WHERE table_schema = %s AND table_name = %s
+                            WHERE table_schema = '{schema}' AND table_name = '{table_name}'
                             ORDER BY ordinal_position
-                            """,
-                            (schema, table_name)
+                            """
                         )
                         columns = cursor.fetchall()
                         results[(schema, table_name)] = columns
                     except (snowflake.connector.errors.Error, Exception) as e:
-                        raise DatabaseConnectionError(f"Error in get_table_info for {schema}.{table_name}: {e}") from e
+                        raise DatabaseConnectionError(
+                            f"Error in get_table_info for {schema}.{table_name}: {e}"
+                        ) from e
             cursor.close()
         except Exception as e:
             raise DatabaseConnectionError(f"Error in get_table_info: {e}") from e
@@ -101,30 +105,25 @@ class SnowflakeConn:
 
     def group_tables_by_type(self, conn, table_names=None, schemas=None):
         numerical_types = {
-            "integer", "bigint", "smallint", "numeric", "real", "double precision", "float", "number"
+            "integer",
+            "bigint",
+            "smallint",
+            "numeric",
+            "real",
+            "double precision",
+            "float",
+            "number",
         }
-        text_types = {
-            "string", "text", "varchar", "char"
-        }
-        date_types = {
-            "date", "timestamp", "timestamptz",
-            "time", "timestamp_ntz", "timestamp_ltz"
-        }
-        bool_types = {
-            "boolean", "bool"
-        }
+        text_types = {"string", "text", "varchar", "char"}
+        date_types = {"date", "timestamp", "timestamptz", "time", "timestamp_ntz", "timestamp_ltz"}
+        bool_types = {"boolean", "bool"}
 
         try:
             table_info = self.get_table_info(conn, table_names, schemas)
             grouped = {}
 
             for (schema, table), columns in table_info.items():
-                groups = {
-                    "numerical": [],
-                    "text": [],
-                    "date": [],
-                    "bool": []
-                }
+                groups = {"numerical": [], "text": [], "date": [], "bool": []}
                 for col, dtype in columns:
                     dtype_l = dtype.lower()
                     if dtype_l in numerical_types:
@@ -142,11 +141,13 @@ class SnowflakeConn:
 
     def table_exists(self, conn, schema, table):
         try:
+            print(f"Checking {schema}, table {table}")
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute(f"""
                 SELECT 1 FROM information_schema.tables
-                WHERE table_schema = %s AND table_name = %s
-            """, (schema, table))
+                WHERE table_schema = '{schema}' AND table_name = '{table}'
+            """)
+            print(f"Checking {schema}, table {table}")
             exists = cursor.fetchone() is not None
             cursor.close()
             return exists
@@ -162,23 +163,24 @@ class SnowflakeConn:
             for schema in schemas:
                 try:
                     cursor.execute(
-                        """
+                        f"""
                         SELECT table_name
                         FROM information_schema.tables
-                        WHERE table_schema = %s AND table_type = 'BASE TABLE'
-                        """,
-                        (schema,)
+                        WHERE table_schema = '{schema}' AND table_type = 'BASE TABLE'
+                        """
                     )
                     tables_in_schema = [row[0] for row in cursor.fetchall()]
                     tables.extend([(schema, t) for t in tables_in_schema])
                 except (snowflake.connector.errors.Error, Exception) as e:
-                    raise DatabaseConnectionError(f"Error in get_tables_in_schemas for {schema}: {e}") from e
+                    raise DatabaseConnectionError(
+                        f"Error in get_tables_in_schemas for {schema}: {e}"
+                    ) from e
             cursor.close()
         except Exception as e:
             raise DatabaseConnectionError(f"Error in get_tables_in_schemas: {e}") from e
         return tables
 
-    def get_table_hashes(self, conn, table_names=None, schemas=None, batch_size=5000):
+    def get_table_hashes(self, conn, table_names=None, schemas=None) -> int:
         if table_names is None:
             raise ValueError("table_names must be provided")
         if schemas is None:
@@ -195,26 +197,16 @@ class SnowflakeConn:
                 for table in table_names:
                     try:
                         if self.table_exists(conn, schema, table):
-                            offset, total_hash = 0, 0
-                            while True:
-                                query = f"""SELECT HASH_AGG(*) FROM
-                                (
-                                SELECT * FROM "{schema}"."{table}" LIMIT {batch_size} OFFSET {offset}
-                                ) AS t"""
-                                cursor.execute(query)
-                                hash_value = cursor.fetchone()[0]
-                                if hash_value is None:
-                                    break
-                                total_hash += hash_value
-                                offset += batch_size
-                                results[(schema, table)] = {
-                                    "hash": total_hash,
-                                    "created_at": datetime.now().isoformat()
-                                }
+                            query = f'SELECT HASH_AGG(*) FROM "{schema}"."{table}"'
+                            cursor.execute(query)
+                            full_hash = cursor.fetchone()[0]
+                            results[(schema, table)] = full_hash
                         else:
                             results[(schema, table)] = None
                     except (snowflake.connector.errors.Error, Exception) as e:
-                        raise DatabaseConnectionError(f"Error in get_table_hashes for {schema}.{table}: {e}") from e
+                        raise DatabaseConnectionError(
+                            f"Error in get_table_hashes for {schema}.{table}: {e}"
+                        ) from e
             cursor.close()
         except Exception as e:
             raise DatabaseConnectionError(f"Error in get_table_hashes: {e}") from e
@@ -222,7 +214,7 @@ class SnowflakeConn:
 
     def get_group_data(self, conn, schemas=None, table_names=None, batch_size=50000):
         if schemas is None:
-            schemas = ["public"]
+            schemas = ["snowflake"]
         if isinstance(schemas, str):
             schemas = [schemas]
         if table_names and isinstance(table_names, str):
@@ -265,13 +257,16 @@ class SnowflakeConn:
                         def fetch_batches():
                             offset = 0
                             while True:
-                                batch_query = f'SELECT {col_str} FROM "{sch}"."{table}" LIMIT {batch_size} OFFSET {offset}'
+                                batch_query = f"""SELECT {col_str} FROM "{sch}"."{table}" 
+                                LIMIT {batch_size} OFFSET {offset}"""
                                 cur = conn.cursor()
                                 try:
                                     cur.execute(batch_query)
                                     rows = cur.fetchall()
                                 except (snowflake.connector.errors.Error, Exception) as e:
-                                    raise DatabaseConnectionError(f"Error in get_group_data for {key}: {e}") from e
+                                    raise DatabaseConnectionError(
+                                        f"Error in get_group_data for {key}: {e}"
+                                    ) from e
                                 finally:
                                     cur.close()
 
@@ -288,6 +283,8 @@ class SnowflakeConn:
                             group_df = pd.concat(fetch_batches(), ignore_index=True)
                             yield key, group_df
                         except Exception as e:
-                            raise DatabaseConnectionError(f"Error in get_group_data for {key}: {e}") from e
+                            raise DatabaseConnectionError(
+                                f"Error in get_group_data for {key}: {e}"
+                            ) from e
         except Exception as e:
             raise DatabaseConnectionError(f"Error in get_group_data: {e}") from e

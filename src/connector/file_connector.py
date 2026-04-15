@@ -3,20 +3,16 @@ import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Union
+
 import pandas as pd
+
 from log import get_ingest_logger
 
 data_logger = get_ingest_logger()
 
-class DataFileLoader:
 
-    DEFAULT_SEARCH_DIRS = [
-        "~/Downloads",
-        "~/Documents",
-        "~/Desktop",
-        "~/OneDrive/Desktop"
-        "."
-    ]
+class DataFileLoader:
+    DEFAULT_SEARCH_DIRS = ["~/Downloads", "~/Documents", "~/Desktop", "~/OneDrive/Desktop."]
 
     SUPPORTED_EXTENSIONS = {
         ".csv": pd.read_csv,
@@ -28,10 +24,21 @@ class DataFileLoader:
     }
 
     BANNED_DIRS = {
-        "venv", ".venv", "env", ".git", "__pycache__",
-        "node_modules", "$recycle.bin", "system volume information",
-        "appdata", "windows", "program files", "program files (x86)",
-        "windowsapps", "microsoft shared", "common files",
+        "venv",
+        ".venv",
+        "env",
+        ".git",
+        "__pycache__",
+        "node_modules",
+        "$recycle.bin",
+        "system volume information",
+        "appdata",
+        "windows",
+        "program files",
+        "program files (x86)",
+        "windowsapps",
+        "microsoft shared",
+        "common files",
     }
 
     def __init__(self, search_dirs: Optional[Union[str, List[str]]] = None) -> None:
@@ -110,7 +117,7 @@ class DataFileLoader:
     def find_all(self, extensions: Optional[List[str]] = None) -> List[Path]:
         if extensions is None:
             extensions = list(self.SUPPORTED_EXTENSIONS.keys())
-        extensions = [ext if ext.startswith('.') else f'.{ext}' for ext in extensions]
+        extensions = [ext if ext.startswith(".") else f".{ext}" for ext in extensions]
         extensions = [ext.lower() for ext in extensions]
 
         all_files = []
@@ -135,7 +142,9 @@ class DataFileLoader:
         try:
             df = loader(file_path)
             for col in df.select_dtypes(include=["object", "string"]).columns:
-                if any(k in col.lower() for k in ["date", "time", "timestamp", "created", "updated"]):
+                if any(
+                    k in col.lower() for k in ["date", "time", "timestamp", "created", "updated"]
+                ):
                     df[col] = pd.to_datetime(df[col], errors="coerce")
             df = df.convert_dtypes()
             data_logger.info(f"Loaded {file_path} ({df.shape[0]} rows, {df.shape[1]} cols)")
@@ -144,7 +153,9 @@ class DataFileLoader:
             data_logger.error(f"Error loading {file_path}: {e}")
             return None
 
-    def get_file_hashes(self, file_path: Optional[Union[str, Path]] = None) -> Dict[str, Dict[str, str]]:
+    def get_file_hashes(
+        self, file_path: Optional[Union[str, Path]] = None
+    ) -> Dict[str, Dict[str, str]]:
         hashes = {}
         if file_path is not None:
             path_obj = Path(file_path)

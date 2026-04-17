@@ -44,6 +44,13 @@ def get_latest_two_hashes(file_path, table_names):
 def compare_algorithm():
     file_path = 'monitoring_history.jsonl'
     get_hash_changes = get_latest_two_hashes(file_path, table_names)
+    for table in table_names:
+        for table, (latest_hash, previous_hash) in get_hash_changes.items():
+            if latest_hash != previous_hash:
+                return f"🚨 Changes detected !!!"
+            else:
+                return f"No changes in table {table}"
+
     table_group = {}
     with open(file_path, "r") as f:
         for line_num, line in enumerate(f, 1):
@@ -59,4 +66,3 @@ def compare_algorithm():
             except json.JSONDecodeError as e:
                     print(f"JSON decode error on line {line_num}: {e}")
         return table_group
-

@@ -1,15 +1,17 @@
 import json
 import mmap
+from scipy import stats
 
-
-def get_latest_two_hashes(file_path, target_table):
-    results = []
+def get_latest_two_hashes(file_path, table_names):
+    from collections import defaultdict
+    results = defaultdict(list)
+    target_set = set(table_names)
 
     with open(file_path, "rb") as f:
         with mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
             position = mm.size()
 
-            while position > 0 and len(results) < 2:
+            while position > 0 and any(len(v) < 2 for v in results.values()) or not results:
                 new_position = mm.rfind(b"\n", 0, position)
 
                 if new_position == -1:
@@ -22,24 +24,39 @@ def get_latest_two_hashes(file_path, target_table):
                 if not line:
                     continue
 
-                if bytes(target_table, "utf-8") in line:
-                    entry = json.loads(line)
-                    if entry.get("table_name") == target_table:
-                        results.append(entry)
+                entry = json.loads(line)
+                table_name = entry.get("table_name")
+                if table_name in target_set and len(results[table_name]) < 2:
+                    results[table_name].append(entry)
 
-    return results
+                if all(len(results[table]) == 2 for table in target_set):
+                    break
 
+    comparison = {}
+    for table, entries in results.items():
+        if len(entries) == 2:
+            latest_hash = entries[0].get('hash')
+            previous_hash = entries[1].get('hash')
+            comparison[table] = (latest_hash, previous_hash)
 
-def apply_algo():
-    pass
+    return comparison
 
+def compare_algorithm():
+    file_path = 'monitoring_history.jsonl'
+    get_hash_changes = get_latest_two_hashes(file_path, table_names)
+    table_group = {}
+    with open(file_path, "r") as f:
+        for line_num, line in enumerate(f, 1):
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+                table_names = record.get('table_name')
+                for col_name, col_metrics in record["metrics"].items():
+                    detected_type = col_metrics.get("detected_type")
+                    table_group[(table_names, col_name)] = detected_type
+            except json.JSONDecodeError as e:
+                    print(f"JSON decode error on line {line_num}: {e}")
+        return table_group
 
-# Testing the microphone 😂
-# history = get_latest_two_hashes('monitoring_history.jsonl', "MARTS_SUPPLYCHAIN.DIM_PRODUCTS")
-
-# if len(history) == 2:
-# curr, prev = history[0], history[1]
-# if curr['hash'] != prev['hash']:
-# print(f"🚨 Drift Detected: {prev['hash']} -> {curr['hash']}")
-# else:
-# print(f"No changes made 🤗")

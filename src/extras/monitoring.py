@@ -79,9 +79,9 @@ def append_profiles_hash(
             with open(output_file, "a") as f:
                 for report in table_reports.values():
                     f.write(json.dumps(report) + "\n")
-            print(
-                f"✅ Successfully appended profiles and hashes for {len(table_reports)} \
-                tables to {output_file}"
+            return (
+                "✅ Successfully appended profiles and hashes for "
+                f"{len(table_reports)} tables to {output_file}"
             )
         else:
-            print("⚠️ No data was processed. Check your table names and schemas.")
+            return "⚠️ No data was processed. Check your table names and schemas."

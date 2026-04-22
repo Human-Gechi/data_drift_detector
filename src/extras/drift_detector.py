@@ -215,7 +215,8 @@ def check_and_alert(file_path, table_names, alpha=0.05):
         return "✅ No hash changes. No drift likely."
 
     print(
-        f"🔍 Hash changes detected for table: {tables_with_change}.Running statistical drift detection...."
+        f"🔍Hash changes detected for table: {tables_with_change}. "
+        "Running statistical drift detection"
     )
 
     drift_report = detect_drift_in_history(file_path, alpha)
@@ -254,4 +255,3 @@ def check_and_alert(file_path, table_names, alpha=0.05):
             )
 
     return "\n".join(messages) if messages else None
-

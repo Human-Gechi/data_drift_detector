@@ -1,16 +1,18 @@
 import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from typing import List
 import time
-from src.extras.drift_detector import check_and_alert
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from typing import List
 
 subject = "Data Drift Report"
 RETRIES = 5
 BASE = 1
 
+
 class Email:
-    def __init__(self, sender_email: str, receiver_email: str, sender_password: str, tables: List[str]):
+    def __init__(
+        self, sender_email: str, receiver_email: str, sender_password: str, tables: List[str]
+    ):
         self.sender_email = sender_email
         self.receiver_email = receiver_email
         self.sender_password = sender_password
@@ -20,6 +22,8 @@ class Email:
         self.tables = tables
 
     def send_email(self, subject=subject, body=None):
+        from src.extras.drift_detector import check_and_alert
+
         drift_report = check_and_alert(self.file_path, self.tables)
 
         if body is None:

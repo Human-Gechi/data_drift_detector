@@ -32,7 +32,7 @@ class Email:
         )
 
     def send_email(self, subject=_EMAIL_SUBJECT, body: str = None):
-        from src.extras.drift_detector import check_and_alert
+        from src.detect.drift_detector import check_and_alert
 
         drift_report = check_and_alert(self.file_path, self.tables)
 

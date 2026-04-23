@@ -2,7 +2,7 @@ import datetime
 import json
 from typing import Dict, List, Literal, Optional
 
-from src.extras.profiler import SummaryStats
+from src.detect.profiler import SummaryStats
 
 
 def append_profiles_hash(
@@ -85,3 +85,4 @@ def append_profiles_hash(
             )
         else:
             return "⚠️ No data was processed. Check your table names and schemas."
+

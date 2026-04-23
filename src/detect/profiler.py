@@ -19,7 +19,7 @@ class SummaryStats:
                 stats[col] = {
                     "detected_type": "numerical",
                     "bin_edges": None,
-                    "expected_percents": None
+                    "expected_percents": None,
                 }
                 continue
             quantiles = np.linspace(0, 1, num_bins + 1)
@@ -51,7 +51,7 @@ class SummaryStats:
                 "count": len(non_null),
                 "count_true": count_true,
                 "nulls": int(series.isnull().sum()),
-                "unique_values": int(series.nunique())
+                "unique_values": int(series.nunique()),
             }
         if stats:
             return json.dumps(stats)
@@ -75,7 +75,7 @@ class SummaryStats:
                     "var": None,
                     "min": None,
                     "max": None,
-                    "null_counts": int(df[col].isnull().sum())
+                    "null_counts": int(df[col].isnull().sum()),
                 }
                 continue
             timestamps = series.astype(np.int64) // 10**9

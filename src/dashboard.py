@@ -2,15 +2,16 @@ import json
 from collections import defaultdict
 from datetime import datetime
 
-import streamlit as st
-import pandas as pd
 import numpy as np
-import plotly.graph_objects as go
+import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+import streamlit as st
 from scipy import stats
 
 st.set_page_config(page_title="Data Drift Monitor", layout="wide")
 st.title("📊 Data Drift Monitoring Dashboard")
+
 
 def read_file(file_path: str = "monitoring_history.jsonl"):
     records = []
@@ -26,6 +27,7 @@ def read_file(file_path: str = "monitoring_history.jsonl"):
         return []
     return records
 
+
 def get_available_tables(records):
     grouped = defaultdict(set)
     for record in records:
@@ -36,6 +38,7 @@ def get_available_tables(records):
             grouped["default"].add(record["table_name"])
     return grouped
 
+
 def extract_historical_numerical_data(records, table_name, column_name):
     timestamps = []
     bin_edges_list = []
@@ -45,11 +48,14 @@ def extract_historical_numerical_data(records, table_name, column_name):
         if record.get("table_name") == table_name and column_name in record.get("metrics", {}):
             col_metrics = record["metrics"][column_name]
             if col_metrics.get("detected_type") == "numerical":
-                timestamps.append(datetime.fromisoformat(record["timestamp"].replace("Z", "+00:00")))
+                timestamps.append(
+                    datetime.fromisoformat(record["timestamp"].replace("Z", "+00:00"))
+                )
                 bin_edges_list.append(col_metrics.get("bin_edges", []))
                 expected_percents_list.append(col_metrics.get("expected_percents", []))
 
     return timestamps, bin_edges_list, expected_percents_list
+
 
 def extract_historical_categorical_data(records, table_name, column_name):
     timestamps = []
@@ -61,12 +67,15 @@ def extract_historical_categorical_data(records, table_name, column_name):
         if record.get("table_name") == table_name and column_name in record.get("metrics", {}):
             col_metrics = record["metrics"][column_name]
             if col_metrics.get("detected_type") in ["categorical", "categorical_high_cardinality"]:
-                timestamps.append(datetime.fromisoformat(record["timestamp"].replace("Z", "+00:00")))
+                timestamps.append(
+                    datetime.fromisoformat(record["timestamp"].replace("Z", "+00:00"))
+                )
                 top_labels_list.append(col_metrics.get("top_labels", {}))
                 uniqueness_ratio_list.append(col_metrics.get("uniqueness_ratio", 0))
                 unique_values_list.append(col_metrics.get("unique_values", 0))
 
     return timestamps, top_labels_list, uniqueness_ratio_list, unique_values_list
+
 
 def calculate_psi(expected, actual):
     psi_values = []
@@ -79,6 +88,7 @@ def calculate_psi(expected, actual):
         psi_values.append(psi_value)
 
     return sum(psi_values)
+
 
 def calculate_js_divergence(p, q):
     p = np.array(p, dtype=np.float64)
@@ -100,7 +110,9 @@ def plot_numerical_drift(timestamps, bin_edges_list, expected_percents_list, col
     if not timestamps or len(timestamps) < 2:
         st.warning(f"Need at least 2 snapshots to calculate drift for {column_name}")
         if timestamps:
-            st.info(f"Only {len(timestamps)} snapshot(s) available. Add more monitoring data to see drift trends.")
+            st.info(
+                f"Only {len(timestamps)} snapshot(s) available. Add more data to see drift trends."
+            )
         return
 
     col1, col2 = st.columns(2)
@@ -112,43 +124,68 @@ def plot_numerical_drift(timestamps, bin_edges_list, expected_percents_list, col
         drift_timestamps = []
 
         for i in range(1, len(expected_percents_list)):
-            if len(expected_percents_list[i]) > 0 and len(expected_percents_list[i-1]) > 0:
-                psi = calculate_psi(
-                        expected_percents_list[i-1],
-                        expected_percents_list[i]
-                    )
+            if len(expected_percents_list[i]) > 0 and len(expected_percents_list[i - 1]) > 0:
+                psi = calculate_psi(expected_percents_list[i - 1], expected_percents_list[i])
 
                 psi_scores.append(psi)
                 drift_timestamps.append(timestamps[i])
 
         if psi_scores:
             fig = go.Figure()
-            fig.add_trace(go.Scatter(
-                x=drift_timestamps,
-                y=psi_scores,
-                mode='lines+markers',
-                name='PSI Score',
-                line=dict(color='red', width=2),
-                marker=dict(size=8, color=psi_scores, colorscale='RdYlGn_r', showscale=True)
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=drift_timestamps,
+                    y=psi_scores,
+                    mode="lines+markers",
+                    name="PSI Score",
+                    line=dict(color="red", width=2),
+                    marker=dict(size=8, color=psi_scores, colorscale="RdYlGn_r", showscale=True),
+                )
+            )
 
-            fig.add_hrect(y0=0, y1=0.1, line_width=0, fillcolor="green", opacity=0.1,
-              annotation_text="Stable (<0.1)", annotation_position="top left")
-            fig.add_hrect(y0=0.1, y1=0.25, line_width=0, fillcolor="orange", opacity=0.1,
-                        annotation_text="Moderate Shift (0.1-0.25)", annotation_position="top left")
-            fig.add_hrect(y0=0.25, y1=1.0, line_width=0, fillcolor="red", opacity=0.1,
-                        annotation_text="Significant Change (≥0.25)", annotation_position="top left")
+            fig.add_hrect(
+                y0=0,
+                y1=0.1,
+                line_width=0,
+                fillcolor="green",
+                opacity=0.1,
+                annotation_text="Stable (<0.1)",
+                annotation_position="top left",
+            )
+            fig.add_hrect(
+                y0=0.1,
+                y1=0.25,
+                line_width=0,
+                fillcolor="orange",
+                opacity=0.1,
+                annotation_text="Moderate Shift (0.1-0.25)",
+                annotation_position="top left",
+            )
+            fig.add_hrect(
+                y0=0.25,
+                y1=1.0,
+                line_width=0,
+                fillcolor="red",
+                opacity=0.1,
+                annotation_text="Significant Change (≥0.25)",
+                annotation_position="top left",
+            )
 
-            fig.add_hline(y=0.1, line_dash="dash", line_color="orange",
-                        annotation_text="Moderate Shift (0.1)")
-            fig.add_hline(y=0.25, line_dash="dash", line_color="red",
-                        annotation_text="Significant Change (0.25)")
+            fig.add_hline(
+                y=0.1, line_dash="dash", line_color="orange", annotation_text="Moderate Shift (0.1)"
+            )
+            fig.add_hline(
+                y=0.25,
+                line_dash="dash",
+                line_color="red",
+                annotation_text="Significant Change (0.25)",
+            )
             fig.update_layout(
                 title=f"Population Stability Index (PSI) Over Time",
                 xaxis_title="Timestamp",
                 yaxis_title="PSI Score",
                 height=450,
-                hovermode='x unified'
+                hovermode="x unified",
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -181,8 +218,8 @@ def plot_numerical_drift(timestamps, bin_edges_list, expected_percents_list, col
 
             if first_percents and latest_percents and latest_bins:
                 bin_labels = []
-                for i in range(len(latest_bins)-1):
-                    bin_labels.append(f"[{latest_bins[i]:.1f}, {latest_bins[i+1]:.1f})")
+                for i in range(len(latest_bins) - 1):
+                    bin_labels.append(f"[{latest_bins[i]:.1f}, {latest_bins[i + 1]:.1f})")
 
                 comparison_percents = first_percents
                 current_percents = latest_percents
@@ -191,28 +228,32 @@ def plot_numerical_drift(timestamps, bin_edges_list, expected_percents_list, col
                 st.metric("Overall PSI (Baseline vs Latest)", f"{overall_psi:.4f}")
 
                 fig = go.Figure()
-                fig.add_trace(go.Bar(
-                    x=bin_labels,
-                    y=comparison_percents,
-                    name=f'Baseline ({timestamps[0].strftime("%Y-%m-%d")})',
-                    marker_color='lightblue',
-                    opacity=0.7
-                ))
-                fig.add_trace(go.Bar(
-                    x=bin_labels,
-                    y=current_percents,
-                    name=f'Latest ({timestamps[-1].strftime("%Y-%m-%d")})',
-                    marker_color='steelblue',
-                    opacity=0.9
-                ))
+                fig.add_trace(
+                    go.Bar(
+                        x=bin_labels,
+                        y=comparison_percents,
+                        name=f"Baseline ({timestamps[0].strftime('%Y-%m-%d')})",
+                        marker_color="lightblue",
+                        opacity=0.7,
+                    )
+                )
+                fig.add_trace(
+                    go.Bar(
+                        x=bin_labels,
+                        y=current_percents,
+                        name=f"Latest ({timestamps[-1].strftime('%Y-%m-%d')})",
+                        marker_color="steelblue",
+                        opacity=0.9,
+                    )
+                )
 
                 fig.update_layout(
                     title="Baseline vs Latest Distribution",
                     xaxis_title="Value Ranges",
                     yaxis_title="Proportion",
                     height=450,
-                    barmode='group',
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    barmode="group",
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                 )
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -220,15 +261,20 @@ def plot_numerical_drift(timestamps, bin_edges_list, expected_percents_list, col
         **Column Statistics:**
         - Number of snapshots: {len(timestamps)}
         - Number of bins: {len(bin_edges_list[-1]) - 1 if bin_edges_list else 0}
-        - First snapshot: {timestamps[0].strftime('%Y-%m-%d %H:%M')}
-        - Latest snapshot: {timestamps[-1].strftime('%Y-%m-%d %H:%M')}
+        - First snapshot: {timestamps[0].strftime("%Y-%m-%d %H:%M")}
+        - Latest snapshot: {timestamps[-1].strftime("%Y-%m-%d %H:%M")}
         """)
 
-def plot_categorical_drift(timestamps, top_labels_list, uniqueness_ratio_list, unique_values_list, column_name):
+
+def plot_categorical_drift(
+    timestamps, top_labels_list, uniqueness_ratio_list, unique_values_list, column_name
+):
     if not timestamps or len(timestamps) < 2:
         st.warning(f"Need at least 2 snapshots to calculate drift for {column_name}")
         if timestamps:
-            st.info(f"Only {len(timestamps)} snapshot(s) available. Add more monitoring data to see drift trends.")
+            st.info(
+                f"Only {len(timestamps)} snapshot(s) available. Add more data to see drift trends."
+            )
         return
 
     col1, col2 = st.columns(2)
@@ -240,17 +286,17 @@ def plot_categorical_drift(timestamps, top_labels_list, uniqueness_ratio_list, u
         drift_timestamps = []
 
         for i in range(1, len(top_labels_list)):
-            if top_labels_list[i-1] and top_labels_list[i]:
-                all_categories = set(top_labels_list[i-1].keys()) | set(top_labels_list[i].keys())
+            if top_labels_list[i - 1] and top_labels_list[i]:
+                all_categories = set(top_labels_list[i - 1].keys()) | set(top_labels_list[i].keys())
 
-                total_counts_prev = sum(top_labels_list[i-1].values())
+                total_counts_prev = sum(top_labels_list[i - 1].values())
                 total_counts_curr = sum(top_labels_list[i].values())
 
                 dist_prev = []
                 dist_curr = []
 
                 for category in all_categories:
-                    count_prev = top_labels_list[i-1].get(category, 0)
+                    count_prev = top_labels_list[i - 1].get(category, 0)
                     count_curr = top_labels_list[i].get(category, 0)
                     dist_prev.append(count_prev / total_counts_prev if total_counts_prev > 0 else 0)
                     dist_curr.append(count_curr / total_counts_curr if total_counts_curr > 0 else 0)
@@ -265,53 +311,94 @@ def plot_categorical_drift(timestamps, top_labels_list, uniqueness_ratio_list, u
             colors = []
             for score in jsd_scores:
                 if score < 0.05:
-                    colors.append('green')
+                    colors.append("green")
                 elif score < 0.10:
-                    colors.append('yellowgreen')
+                    colors.append("yellowgreen")
                 elif score < 0.20:
-                    colors.append('orange')
+                    colors.append("orange")
                 elif score < 0.35:
-                    colors.append('red')
+                    colors.append("red")
                 else:
-                    colors.append('darkred')
+                    colors.append("darkred")
 
-            fig.add_trace(go.Scatter(
-                x=drift_timestamps,
-                y=jsd_scores,
-                mode='lines+markers',
-                name='JSD Score',
-                line=dict(color='blue', width=2),
-                marker=dict(size=10, color=colors,
-                          symbol='circle',
-                          line=dict(color='black', width=1))
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=drift_timestamps,
+                    y=jsd_scores,
+                    mode="lines+markers",
+                    name="JSD Score",
+                    line=dict(color="blue", width=2),
+                    marker=dict(
+                        size=10, color=colors, symbol="circle", line=dict(color="black", width=1)
+                    ),
+                )
+            )
 
-            fig.add_hrect(y0=0, y1=0.05, line_width=0, fillcolor="green", opacity=0.1,
-                         annotation_text="Very Low Drift", annotation_position="top left")
-            fig.add_hrect(y0=0.05, y1=0.10, line_width=0, fillcolor="yellow", opacity=0.1,
-                         annotation_text="Low Drift", annotation_position="top left")
-            fig.add_hrect(y0=0.10, y1=0.20, line_width=0, fillcolor="orange", opacity=0.1,
-                         annotation_text="Moderate Drift", annotation_position="top left")
-            fig.add_hrect(y0=0.20, y1=0.35, line_width=0, fillcolor="red", opacity=0.1,
-                         annotation_text="High Drift", annotation_position="top left")
-            fig.add_hrect(y0=0.35, y1=1.0, line_width=0, fillcolor="darkred", opacity=0.1,
-                         annotation_text="Very High Drift", annotation_position="top left")
+            fig.add_hrect(
+                y0=0,
+                y1=0.05,
+                line_width=0,
+                fillcolor="green",
+                opacity=0.1,
+                annotation_text="Very Low Drift",
+                annotation_position="top left",
+            )
+            fig.add_hrect(
+                y0=0.05,
+                y1=0.10,
+                line_width=0,
+                fillcolor="yellow",
+                opacity=0.1,
+                annotation_text="Low Drift",
+                annotation_position="top left",
+            )
+            fig.add_hrect(
+                y0=0.10,
+                y1=0.20,
+                line_width=0,
+                fillcolor="orange",
+                opacity=0.1,
+                annotation_text="Moderate Drift",
+                annotation_position="top left",
+            )
+            fig.add_hrect(
+                y0=0.20,
+                y1=0.35,
+                line_width=0,
+                fillcolor="red",
+                opacity=0.1,
+                annotation_text="High Drift",
+                annotation_position="top left",
+            )
+            fig.add_hrect(
+                y0=0.35,
+                y1=1.0,
+                line_width=0,
+                fillcolor="darkred",
+                opacity=0.1,
+                annotation_text="Very High Drift",
+                annotation_position="top left",
+            )
 
-            fig.add_hline(y=0.05, line_dash="dash", line_color="green",
-                         annotation_position="bottom right")
-            fig.add_hline(y=0.10, line_dash="dash", line_color="orange",
-                          annotation_position="bottom right")
-            fig.add_hline(y=0.20, line_dash="dash", line_color="red",
-                          annotation_position="bottom right")
-            fig.add_hline(y=0.35, line_dash="dash", line_color="darkred",
-                          annotation_position="bottom right")
+            fig.add_hline(
+                y=0.05, line_dash="dash", line_color="green", annotation_position="bottom right"
+            )
+            fig.add_hline(
+                y=0.10, line_dash="dash", line_color="orange", annotation_position="bottom right"
+            )
+            fig.add_hline(
+                y=0.20, line_dash="dash", line_color="red", annotation_position="bottom right"
+            )
+            fig.add_hline(
+                y=0.35, line_dash="dash", line_color="darkred", annotation_position="bottom right"
+            )
 
             fig.update_layout(
                 title=f"Jensen-Shannon Divergence (JSD) Over Time",
                 xaxis_title="Timestamp",
                 yaxis_title="JSD Score (0 = identical, 1 = completely different)",
                 height=500,
-                hovermode='x unified'
+                hovermode="x unified",
             )
             st.plotly_chart(fig, use_container_width=True)
 
@@ -410,29 +497,40 @@ def plot_categorical_drift(timestamps, top_labels_list, uniqueness_ratio_list, u
             if len(jsd_scores) >= 3:
                 trend = np.polyfit(range(len(jsd_scores)), jsd_scores, 1)[0]
                 if trend > 0.01:
-                    st.warning(f"📈 **Upward trend detected!** JSD increasing by {trend:.4f} per snapshot. Drift is worsening over time.")
+                    st.warning(
+                        f"📈 **Upward trend detected!** JSD increasing by {trend:.4f}"
+                        "per snapshot. Drift is worsening over time."
+                    )
                 elif trend < -0.01:
-                    st.info(f"📉 **Downward trend detected!** JSD decreasing by {abs(trend):.4f} per snapshot. Distribution stabilizing.")
+                    st.info(
+                        f"📉 **Downward trend detected!** JSD decreasing by {abs(trend):.4f}"
+                        "per snapshot. Distribution stabilizing."
+                    )
                 else:
-                    st.success(f"➡️ **Stable trend** - No significant increase or decrease in drift.")
+                    st.success(
+                        f"➡️ **Stable trend** - No significant increase or decrease in drift."
+                    )
 
         fig2 = go.Figure()
-        fig2.add_trace(go.Scatter(
-            x=timestamps,
-            y=uniqueness_ratio_list,
-            mode='lines+markers',
-            name='Uniqueness Ratio',
-            line=dict(color='green', width=2),
-            marker=dict(size=8, color=uniqueness_ratio_list,
-                      colorscale='Viridis', showscale=True)
-        ))
+        fig2.add_trace(
+            go.Scatter(
+                x=timestamps,
+                y=uniqueness_ratio_list,
+                mode="lines+markers",
+                name="Uniqueness Ratio",
+                line=dict(color="green", width=2),
+                marker=dict(
+                    size=8, color=uniqueness_ratio_list, colorscale="Viridis", showscale=True
+                ),
+            )
+        )
 
         fig2.update_layout(
             title=f"Category Uniqueness Over Time (Lower = More Repetitive, Higher = More Diverse)",
             xaxis_title="Timestamp",
             yaxis_title="Uniqueness Ratio",
             height=300,
-            hovermode='x unified'
+            hovermode="x unified",
         )
         st.plotly_chart(fig2, use_container_width=True)
 
@@ -443,7 +541,9 @@ def plot_categorical_drift(timestamps, top_labels_list, uniqueness_ratio_list, u
             elif current_uniqueness < 0.3:
                 st.caption("🟡 **Moderate diversity** - Some repetition, some unique values")
             else:
-                st.caption("🟢 **High cardinality** - Many unique values, typical for IDs or free text")
+                st.caption(
+                    "🟢 **High cardinality** - Many unique values, typical for IDs or free text"
+                )
 
     with col2:
         st.subheader(f"🔝 {column_name} - Top Categories Comparison")
@@ -463,40 +563,47 @@ def plot_categorical_drift(timestamps, top_labels_list, uniqueness_ratio_list, u
                 if first > 0:
                     pct_change = ((latest - first) / first) * 100
                 else:
-                    pct_change = float('inf') if latest > 0 else 0
+                    pct_change = float("inf") if latest > 0 else 0
                 pct_changes.append(pct_change)
 
             fig = go.Figure()
-            fig.add_trace(go.Bar(
-                x=categories,
-                y=first_counts,
-                name=f'Baseline ({timestamps[0].strftime("%Y-%m-%d")})',
-                marker_color='lightcoral',
-                text=first_counts,
-                textposition='auto'
-            ))
-            fig.add_trace(go.Bar(
-                x=categories,
-                y=latest_counts,
-                name=f'Latest ({timestamps[-1].strftime("%Y-%m-%d")})',
-                marker_color='coral',
-                text=latest_counts,
-                textposition='auto'
-            ))
+            fig.add_trace(
+                go.Bar(
+                    x=categories,
+                    y=first_counts,
+                    name=f"Baseline ({timestamps[0].strftime('%Y-%m-%d')})",
+                    marker_color="lightcoral",
+                    text=first_counts,
+                    textposition="auto",
+                )
+            )
+            fig.add_trace(
+                go.Bar(
+                    x=categories,
+                    y=latest_counts,
+                    name=f"Latest ({timestamps[-1].strftime('%Y-%m-%d')})",
+                    marker_color="coral",
+                    text=latest_counts,
+                    textposition="auto",
+                )
+            )
 
             fig.update_layout(
                 title="Top Categories: Baseline vs Latest",
                 xaxis_title="Category",
                 yaxis_title="Frequency",
                 height=400,
-                barmode='group'
+                barmode="group",
             )
             st.plotly_chart(fig, use_container_width=True)
 
             st.subheader("Category Frequency Changes")
             for cat, pct in zip(categories, pct_changes):
-                if pct == float('inf'):
-                    st.warning(f"🆕 **{cat}**: New category (was 0, now {latest_counts[categories.index(cat)]})")
+                if pct == float("inf"):
+                    st.warning(
+                        f"""🆕 **{cat}**:New category (was 0,now 
+                        {latest_counts[categories.index(cat)]})"""
+                    )
                 elif pct > 20:
                     st.error(f"📈 **{cat}**: Increased by {pct:.1f}%")
                 elif pct < -20:
@@ -518,16 +625,21 @@ def plot_categorical_drift(timestamps, top_labels_list, uniqueness_ratio_list, u
 
             overall_jsd = calculate_js_divergence(dist_first, dist_latest)
 
-
             if overall_jsd < 0.05:
-                st.success(f"✅ **Overall JSD (Baseline vs Latest):** {overall_jsd:.4f} - Very Low Drift| No Drrift")
+                st.success(
+                    f"✅ **Overall JSD (Baseline vs Latest):** {overall_jsd:.4f}"
+                    "- Very Low Drift|No Drift"
+                )
             elif overall_jsd < 0.10:
                 st.info(f"📊 **Overall JSD (Baseline vs Latest):** {overall_jsd:.4f} - Low Drift")
             elif overall_jsd < 0.20:
-                st.warning(f"⚠️ **Overall JSD (Baseline vs Latest):** {overall_jsd:.4f} - Moderate Drift")
+                st.warning(
+                    f"⚠️ **Overall JSD (Baseline vs Latest):** {overall_jsd:.4f} - Moderate Drift"
+                )
             else:
-                st.error(f"🚨 **Overall JSD (Baseline vs Latest):** {overall_jsd:.4f} - High/Very High Drift")
-
+                st.error(
+                    f"🚨 **Overall JSD (Baseline vs Latest):** {overall_jsd:.4f} - High/High Drift"
+                )
 
             st.info(f"""
             **Column Statistics:**
@@ -548,6 +660,7 @@ def plot_categorical_drift(timestamps, top_labels_list, uniqueness_ratio_list, u
         else:
             st.warning("No top labels data available for comparison")
 
+
 def main():
     records = read_file()
 
@@ -564,7 +677,9 @@ def main():
     tables = sorted(available_tables.get(selected_schema, set()))
     selected_table = st.sidebar.selectbox("Select Table", tables)
 
-    full_table_name = f"{selected_schema}.{selected_table}" if selected_schema != "default" else selected_table
+    full_table_name = (
+        f"{selected_schema}.{selected_table}" if selected_schema != "default" else selected_table
+    )
 
     st.sidebar.markdown("--")
     st.sidebar.info(f"""
@@ -608,10 +723,12 @@ def main():
             plot_numerical_drift(timestamps, bin_edges, expected_percents, selected_column)
 
         elif detected_type in ["categorical", "categorical_high_cardinality", "unstructured_text"]:
-            timestamps, top_labels, uniqueness_ratio, unique_values = extract_historical_categorical_data(
-                table_records, full_table_name, selected_column
+            timestamps, top_labels, uniqueness_ratio, unique_values = (
+                extract_historical_categorical_data(table_records, full_table_name, selected_column)
             )
-            plot_categorical_drift(timestamps, top_labels, uniqueness_ratio, unique_values, selected_column)
+            plot_categorical_drift(
+                timestamps, top_labels, uniqueness_ratio, unique_values, selected_column
+            )
         else:
             st.warning(f"Unknown column type: {detected_type}")
 
@@ -642,23 +759,30 @@ def main():
             ts = datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00"))
             timestamps_all.append(ts)
             valid_records.append(r)
-        except:
+        except Exception:
             continue
 
     if timestamps_all:
-        timeline_df = pd.DataFrame({
-            "Timestamp": timestamps_all,
-            "Table": [r.get("table_name", "unknown") for r in valid_records]
-        })
+        timeline_df = pd.DataFrame(
+            {
+                "Timestamp": timestamps_all,
+                "Table": [r.get("table_name", "unknown") for r in valid_records],
+            }
+        )
 
-        fig = px.scatter(timeline_df, x="Timestamp", y="Table",
-                         title="Monitoring Updates Over Time",
-                         labels={"Timestamp": "Time", "Table": "Table Name"},
-                         color="Table",
-                         hover_data={"Timestamp": ":%Y-%m-%d %H:%M:%S"})
+        fig = px.scatter(
+            timeline_df,
+            x="Timestamp",
+            y="Table",
+            title="Monitoring Updates Over Time",
+            labels={"Timestamp": "Time", "Table": "Table Name"},
+            color="Table",
+            hover_data={"Timestamp": ":%Y-%m-%d %H:%M:%S"},
+        )
 
         fig.update_layout(height=400, showlegend=True)
         st.plotly_chart(fig, use_container_width=True)
+
 
 if __name__ == "__main__":
     main()

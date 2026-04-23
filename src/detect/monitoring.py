@@ -85,4 +85,3 @@ def append_profiles_hash(
             )
         else:
             return "⚠️ No data was processed. Check your table names and schemas."
-

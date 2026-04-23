@@ -1,12 +1,16 @@
+import os
 import smtplib
 import time
+from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import List
 
-subject = "Data Drift Report"
-RETRIES = 5
-BASE = 1
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+_EMAIL_SUBJECT = "Data Drift Alert"
+_RETRIES = 5
+_BASE = 1
 
 
 class Email:
@@ -21,31 +25,37 @@ class Email:
         self.file_path = "monitoring_history.jsonl"
         self.tables = tables
 
-    def send_email(self, subject=subject, body=None):
+        template_dir = os.path.join(os.path.dirname(__file__), "templates")
+
+        self.env = Environment(
+            loader=FileSystemLoader(template_dir), autoescape=select_autoescape(["html", "xml"])
+        )
+
+    def send_email(self, subject=_EMAIL_SUBJECT, body: str = None):
         from src.extras.drift_detector import check_and_alert
 
         drift_report = check_and_alert(self.file_path, self.tables)
 
-        if body is None:
-            body = drift_report
+        template = self.env.get_template("drift_alert.html")
+        html_body = template.render(timestamp=datetime.now().isoformat(), drift_report=drift_report)
 
-        message = MIMEMultipart()
+        message = MIMEMultipart("alternative")
         message["From"] = self.sender_email
         message["To"] = self.receiver_email
         message["Subject"] = subject
 
-        message.attach(MIMEText(body, "plain"))
+        message.attach(MIMEText(html_body, "html"))
 
         attempt = 0
-        while attempt < RETRIES:
+        while attempt < _RETRIES:
             try:
                 with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                     server.starttls()
                     server.login(self.sender_email, self.sender_password)
                     server.sendmail(self.sender_email, self.receiver_email, message.as_string())
-                return f"Email sucessfully sent to {self.receiver_email}"
+                print(f"✅ Email successfully sent to {self.receiver_email}")
             except Exception as e:
                 attempt += 1
                 print(f"Attempt {attempt} failed: {e}")
-                time.sleep(BASE * attempt)
-        return f"Failed to send email after retries {RETRIES}"
+                time.sleep(_BASE * attempt)
+        print(f"Failed to send email after {_RETRIES} retries")

@@ -5,3 +5,4 @@ Product.csv
 __pycache__
 hashes.jsonl
 monitoring_history.jsonl
+.env

@@ -34,13 +34,12 @@ def append_profiles_hash(
     else:
         raise ConnectionError(f"Unsupported connection type: {conn_type}")
 
+    hashes = connector.get_file_hashes(file_path=file_path)
     with connector as conn:
         if conn_type == "bigquery":
             hashes = connector.get_table_hashes(
                 conn, client, datasets=datasets, table_names=table_names
             )
-        elif conn_type == "file":
-            hashes = connector.get_file_hashes(file_path=file_path)
         else:
             hashes = connector.get_table_hashes(conn, table_names=table_names, schemas=schemas)
 
@@ -85,3 +84,7 @@ def append_profiles_hash(
             )
         else:
             return "⚠️ No data was processed. Check your table names and schemas."
+
+
+conn = append_profiles_hash(conn_type="file", file_path="Product.csv")
+print(conn)

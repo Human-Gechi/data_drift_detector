@@ -1,4 +1,6 @@
 import json
+import os
+import sys
 from collections import defaultdict
 from datetime import datetime
 
@@ -9,7 +11,9 @@ import plotly.graph_objects as go
 import streamlit as st
 from scipy import stats
 
-st.set_page_config(page_title="Data Drift Monitor", layout="wide")
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
+
+st.set_page_config(page_title="Data Drift Monitor", page_icon="📡", layout="wide")
 st.title("📊 Data Drift Monitoring Dashboard")
 
 
@@ -55,6 +59,28 @@ def extract_historical_numerical_data(records, table_name, column_name):
                 expected_percents_list.append(col_metrics.get("expected_percents", []))
 
     return timestamps, bin_edges_list, expected_percents_list
+
+
+def extract_historical_date_date(records, table_name, column_name):
+    timestamps = []
+    min_dates = []
+    max_dates = []
+    count_dates = []
+    null_count = []
+
+    for record in records:
+        if record.get("table_name") == table_name and column_name in record.get("metrics", {}):
+            col_metrics = record["metrics"][column_name]
+            if col_metrics.get("detected_type") == "date":
+                timestamps.append(
+                    datetime.fromisoformat(record["timestamp"].replace("Z", "+00:00"))
+                )
+                max_dates.append(col_metrics.get("max", 0))
+                min_dates.append(col_metrics.get("min", 0))
+                count_dates.append(col_metrics.get("count", 0))
+                null_count.append(col_metrics.get("null_counts", 0))
+
+    return timestamps, min_dates, max_dates, count_dates, null_count
 
 
 def extract_historical_categorical_data(records, table_name, column_name):
@@ -187,7 +213,7 @@ def plot_numerical_drift(timestamps, bin_edges_list, expected_percents_list, col
                 height=450,
                 hovermode="x unified",
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
             if psi_scores and psi_scores[-1] >= 0.2:
                 st.error(f"⚠️ **Significant Numerical Drift!** Latest PSI: {psi_scores[-1]:.4f}")
@@ -255,7 +281,7 @@ def plot_numerical_drift(timestamps, bin_edges_list, expected_percents_list, col
                     barmode="group",
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width="stretch")
 
         st.info(f"""
         **Column Statistics:**
@@ -400,7 +426,7 @@ def plot_categorical_drift(
                 height=500,
                 hovermode="x unified",
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
             latest_jsd = jsd_scores[-1]
 
@@ -484,7 +510,7 @@ def plot_categorical_drift(
                 **When to be concerned:**
                 - **Rapid increases** in JSD over short time periods
                 - **Sustained JSD > 0.10** for critical features
-                - **JSD > 0.20** for production models
+                - **JSD > 0.20** for production ML models or data models 
                 
                 **Common causes of high JSD:**
                 1. Data pipeline errors or missing data
@@ -595,7 +621,7 @@ def plot_categorical_drift(
                 height=400,
                 barmode="group",
             )
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
             st.subheader("Category Frequency Changes")
             for cat, pct in zip(categories, pct_changes):
@@ -661,6 +687,104 @@ def plot_categorical_drift(
             st.warning("No top labels data available for comparison")
 
 
+def plot_date_drift(
+    timestamps,
+    min_dates,
+    max_dates,
+    count_dates,
+    null_count,
+    column_name,
+    selected_year=None,
+    selected_month=None,
+    selected_day=None,
+):
+    curr_null_count = null_count[-1]
+    curr_count_dates = count_dates[-1]
+
+    if selected_year is not None:
+        indices = [i for i, dt in enumerate(timestamps) if dt.year == selected_year]
+        timestamps = [timestamps[i] for i in indices]
+        min_dates = [min_dates[i] for i in indices]
+        max_dates = [max_dates[i] for i in indices]
+
+    if selected_month is not None:
+        indices = [i for i, dt in enumerate(timestamps) if dt.month == selected_month]
+        timestamps = [timestamps[i] for i in indices]
+        min_dates = [min_dates[i] for i in indices]
+        max_dates = [max_dates[i] for i in indices]
+
+    timestamp = [dt for dt in timestamps]
+    min_dates_dt = [datetime.fromtimestamp(m) for m in min_dates]
+    max_dates_dt = [datetime.fromtimestamp(m) for m in max_dates]
+
+    fig = go.Figure()
+
+    fig.add_trace(
+        go.Scatter(
+            x=timestamp,
+            y=min_dates_dt,
+            mode="lines+markers",
+            name="Min Date",
+            line=dict(color="blue", width=2),
+            marker=dict(size=8),
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=timestamp,
+            y=max_dates_dt,
+            mode="lines+markers",
+            name="Max Date",
+            line=dict(color="red", width=2),
+            marker=dict(size=8),
+        )
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=timestamp + timestamp[::-1],
+            y=min_dates_dt + max_dates_dt[::-1],
+            fill="toself",
+            fillcolor="rgba(128, 128, 128, 0.2)",
+            line=dict(color="rgba(0,0,0,0)"),
+            name="Date Range",
+            showlegend=True,
+        )
+    )
+
+    fig.update_yaxes(tickformat="%Y-%m-%d")
+
+    fig.update_layout(
+        title=f"{column_name}: min/max date tracking",
+        xaxis_title="Profile Run Date",
+        yaxis_title="Date Value",
+        height=500,
+        hovermode="x unified",
+        template="plotly_white",
+    )
+
+    st.plotly_chart(fig, width="stretch")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        null_pct = (curr_null_count / curr_count_dates * 100) if curr_count_dates > 0 else 0
+        st.metric(
+            "📊 Current Data Completeness",
+            f"{(100 - null_pct):.1f}%",
+            delta=f"{curr_null_count} null values" if curr_null_count > 0 else "No missing data",
+            delta_color="off",
+        )
+
+    with col2:
+        st.metric(
+            "📋 Current Unique Date Count",
+            f"{curr_count_dates:,}",
+            help="Total number of non-null date values",
+        )
+
+
 def main():
     records = read_file()
 
@@ -677,23 +801,21 @@ def main():
     tables = sorted(available_tables.get(selected_schema, set()))
     selected_table = st.sidebar.selectbox("Select Table", tables)
 
-    full_table_name = (
-        f"{selected_schema}.{selected_table}" if selected_schema != "default" else selected_table
-    )
+    full_table_name = f"{selected_schema}.{selected_table}"
 
-    st.sidebar.markdown("--")
+    st.sidebar.markdown("---")
     st.sidebar.info(f"""
     **Current Selection:**
-    - Schema: `{selected_schema}`
-    - Table: `{selected_table}`
+    - **Schema:** `{selected_schema}`
+    - **Table:** `{selected_table}`
     """)
 
-    st.header(f"Table: {full_table_name}")
+    st.header(f"Table: {selected_table}")
 
     table_records = [r for r in records if r.get("table_name") == full_table_name]
 
     if not table_records:
-        st.warning(f"No metrics found for table {full_table_name}")
+        st.warning(f"No metrics found for table {tables}")
         return
 
     latest_record = table_records[-1]
@@ -713,7 +835,7 @@ def main():
         col_metrics = metrics[selected_column]
         detected_type = col_metrics.get("detected_type", "unknown")
 
-        st.markdown(f"### Analysis for: `{selected_column}`")
+        st.markdown(f"### Analysis for column: `{selected_column}`")
         st.markdown(f"**Detected Type:** `{detected_type}`")
 
         if detected_type == "numerical":
@@ -729,49 +851,71 @@ def main():
             plot_categorical_drift(
                 timestamps, top_labels, uniqueness_ratio, unique_values, selected_column
             )
+        elif detected_type == "date":
+            timestamps, min_dates, max_dates, count_dates, null_count = (
+                extract_historical_date_date(table_records, full_table_name, selected_column)
+            )
+            years = sorted(set(dt.year for dt in timestamps))
+            selected_year = st.selectbox("Year", years)
+            months = sorted(set(dt.month for dt in timestamps if dt.year == selected_year))
+            selected_month = st.selectbox("Month", months)
+            plot_date_drift(
+                timestamps,
+                min_dates,
+                max_dates,
+                count_dates,
+                null_count,
+                selected_column,
+                selected_year,
+                selected_month,
+            )
         else:
             st.warning(f"Unknown column type: {detected_type}")
 
         with st.expander("📄 View Raw Metrics Data"):
             st.json(col_metrics)
 
-    st.markdown("---")
-    st.header("📈 Dashboard Summary")
-
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric("Total Tables Monitored", len(set(r.get("table_name") for r in records)))
-
-    with col2:
-        st.metric("Total Snapshots", len(records))
-
-    with col3:
-        columns_count = sum(len(r.get("metrics", {})) for r in records)
-        st.metric("Total Column Metrics", columns_count)
-
     st.subheader("Update Timeline")
     timestamps_all = []
     valid_records = []
 
     for r in records:
-        try:
-            ts = datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00"))
-            timestamps_all.append(ts)
-            valid_records.append(r)
-        except Exception:
-            continue
+        if r.get("table_name", "unknown") == full_table_name:
+            try:
+                ts = datetime.fromisoformat(r["timestamp"].replace("Z", "+00:00"))
+                timestamps_all.append(ts)
+                valid_records.append(r)
+            except Exception:
+                continue
 
     if timestamps_all:
-        timeline_df = pd.DataFrame(
-            {
-                "Timestamp": timestamps_all,
-                "Table": [r.get("table_name", "unknown") for r in valid_records],
-            }
+        timeline_df = pd.DataFrame({"Timestamp": timestamps_all, "Table": full_table_name})
+        timeline_years = sorted(set(dt.year for dt in timestamps_all))
+        timeline_selected_year = st.selectbox("Timeline Year", timeline_years)
+        timeline_months = ["All"] + sorted(
+            set(dt.month for dt in timestamps_all if dt.year == timeline_selected_year)
         )
+        timeline_selected_month = st.selectbox("Timeline Month", timeline_months)
+        if timeline_selected_month == "All":
+            timeline_days = ["All"]
+        else:
+            timeline_days = ["All"] + sorted(
+                set(
+                    dt.day
+                    for dt in timestamps_all
+                    if dt.year == timeline_selected_year and dt.month == timeline_selected_month
+                )
+            )
+        timeline_selected_days = st.selectbox("Timeline Day", timeline_days)
+
+        filtered_df = timeline_df[(timeline_df["Timestamp"].dt.year == timeline_selected_year)]
+        if timeline_selected_month != "All":
+            filtered_df = filtered_df[filtered_df["Timestamp"].dt.month == timeline_selected_month]
+        if timeline_selected_days != "All":
+            filtered_df = filtered_df[filtered_df["Timestamp"].dt.day == timeline_selected_days]
 
         fig = px.scatter(
-            timeline_df,
+            filtered_df,
             x="Timestamp",
             y="Table",
             title="Monitoring Updates Over Time",
@@ -781,7 +925,7 @@ def main():
         )
 
         fig.update_layout(height=400, showlegend=True)
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 
 if __name__ == "__main__":

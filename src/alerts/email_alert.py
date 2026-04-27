@@ -28,10 +28,10 @@ class Email:
         template_dir = os.path.join(os.path.dirname(__file__), "templates")
 
         self.env = Environment(
-            loader=FileSystemLoader(template_dir), autoescape=select_autoescape(["html", "xml"])
+            loader=FileSystemLoader(template_dir), autoescape=select_autoescape(["html"])
         )
 
-    def send_email(self, subject=_EMAIL_SUBJECT, body: str = None):
+    def send_email(self, subject=_EMAIL_SUBJECT, html_body: str = None):
         from src.detect.drift_detector import check_and_alert
 
         drift_report = check_and_alert(self.file_path, self.tables)

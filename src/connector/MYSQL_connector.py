@@ -35,7 +35,7 @@ class MySQLConnector:
     port: int
     user: str
     password: str
-    db: str
+    database: str
 
     def __enter__(self):
         try:

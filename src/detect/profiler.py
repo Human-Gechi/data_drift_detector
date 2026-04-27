@@ -45,13 +45,12 @@ class SummaryStats:
         for col in bool_df.columns:
             series = bool_df[col]
             non_null = series.dropna()
-            count_true = int(non_null.sum()) if not non_null.empty else 0
             stats[col] = {
                 "detected_type": "boolean",
                 "count": len(non_null),
-                "count_true": count_true,
+                "value_counts": series.value_counts(dropna=False).to_dict(),
                 "nulls": int(series.isnull().sum()),
-                "unique_values": int(series.nunique()),
+                "unique_values": series.unique().tolist(),
             }
         if stats:
             return json.dumps(stats)
@@ -75,7 +74,7 @@ class SummaryStats:
                     "var": None,
                     "min": None,
                     "max": None,
-                    "null_counts": int(df[col].isnull().sum()),
+                    "nulls": int(df[col].isnull().sum()),
                 }
                 continue
             timestamps = series.astype(np.int64) // 10**9
@@ -88,7 +87,7 @@ class SummaryStats:
                 "var": var_ts,
                 "min": int(series.min().timestamp()),
                 "max": int(series.max().timestamp()),
-                "null_counts": int(df[col].isnull().sum()),
+                "nulls": int(df[col].isnull().sum()),
             }
         if stats:
             return json.dumps(stats)

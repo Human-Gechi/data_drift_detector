@@ -34,7 +34,7 @@ class PostgresConn:
     host: str
     port: int
     user: str
-    db: str
+    database: str
     password: str
 
     def __enter__(self):
@@ -44,7 +44,7 @@ class PostgresConn:
                 port=self.port,
                 user=self.user,
                 password=self.password,
-                dbname=self.db,
+                dbname=self.database,
             )
             return self.conn
         except (

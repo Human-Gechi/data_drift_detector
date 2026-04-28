@@ -150,7 +150,7 @@ class MySQLConnector:
                     elif dtype_l in date_types:
                         groups["date"].append(col)
                     elif dtype_l in bool_types:
-                        groups["bool"].append(col)
+                        groups["boolean"].append(col)
                 grouped[(schema, table)] = groups
             return grouped
         except Exception as e:

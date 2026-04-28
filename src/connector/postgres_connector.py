@@ -140,7 +140,7 @@ class PostgresConn:
                     elif dtype_l in date_types:
                         groups["date"].append(col)
                     elif dtype_l in bool_types:
-                        groups["bool"].append(col)
+                        groups["boolean"].append(col)
                 grouped[(schema, table)] = groups
             return grouped
         except Exception as e:
@@ -258,7 +258,7 @@ class PostgresConn:
 
     def get_group_data(self, conn, schemas=None, table_names=None, batch_size=50000):
         if schemas is None:
-            schemas = ["PUBLIC"]
+            schemas = ["public"]
         if isinstance(schemas, str):
             schemas = [schemas]
         if table_names and isinstance(table_names, str):

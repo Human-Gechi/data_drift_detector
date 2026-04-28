@@ -133,7 +133,7 @@ class SnowflakeConn:
                     elif dtype_l in date_types:
                         groups["date"].append(col)
                     elif dtype_l in bool_types:
-                        groups["bool"].append(col)
+                        groups["boolean"].append(col)
                 grouped[(schema, table)] = groups
             return grouped
         except Exception as e:
@@ -184,7 +184,7 @@ class SnowflakeConn:
         if table_names is None:
             raise ValueError("table_names must be provided")
         if schemas is None:
-            schemas = ["public"]
+            schemas = ["snowflake"]
         if isinstance(table_names, str):
             table_names = [table_names]
         if isinstance(schemas, str):

@@ -7,6 +7,7 @@ import pandas as pd
 class SummaryStats:
     @staticmethod
     def profile_numeric(df: pd.DataFrame, num_bins=5) -> str:
+        df = df.apply(pd.to_numeric, errors="ignore")
         numeric_df = df.select_dtypes(include=["number"])
 
         if numeric_df.empty:

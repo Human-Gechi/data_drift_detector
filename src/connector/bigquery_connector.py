@@ -123,30 +123,48 @@ class BigQueryConn:
         table = conn.get_table(table_ref)
         return set(field.field_type for field in table.schema)
 
-    def get_group_data(self, conn, datasets: List[str], table_names: List[str], limit: int = 1000):
+    def get_group_data(
+        self, conn, datasets: List[str], table_names: List[str], batch_size: int = 50000
+    ):
         for dataset in datasets:
             for table_name in table_names:
                 dtypes = self.available_dtypes(conn, dataset, table_name)
                 print(f"Available dtypes in {dataset}.{table_name}: {dtypes}")
 
-                try:
-                    if dtypes:
-                        groups = self.group_columns_by_type(conn, dataset, table_name)
-                except NotFound:
-                    print(f"Table reference {dataset}.{table_name} does not exist. Skipping.....⏩")
+                if not dtypes:
                     continue
 
                 table_ref = f"{conn.project}.{dataset}.{table_name}"
+                table = conn.get_table(table_ref)
+                total_rows = table.num_rows
+
+                groups = self.group_columns_by_type(conn, dataset, table_name)
                 for group, columns in groups.items():
-                    key = f"{table_ref}.{group}"
                     if not columns:
                         continue
+                    key = f"{table_ref}.{group}"
                     col_str = ", ".join([f"`{col}`" for col in columns])
-                    query = f"SELECT {col_str} FROM `{table_ref}` LIMIT {limit}"
+
+                    def fetch_batches():
+                        for offset in range(0, total_rows, batch_size):
+                            query = f"""SELECT {col_str} FROM `{table_ref}` 
+                            LIMIT {batch_size} OFFSET {offset}"""
+                            try:
+                                query_job = conn.query(query)
+                                df = query_job.to_dataframe()
+                                if df.empty:
+                                    break
+                                yield df
+                            except Exception as e:
+                                print(
+                                    f"""Error querying {table_ref} for group {group}
+                                    (offset {offset}): {e}"""
+                                )
+                                break
+
                     try:
-                        query_job = conn.query(query)
-                        df = query_job.to_dataframe()
-                        yield key, df
+                        group_df = pd.concat(fetch_batches(), ignore_index=True)
+                        yield key, group_df
                     except Exception as e:
-                        print(f"Error querying {table_ref} for group {group}: {e}")
+                        print(f"Error concatenating batches for {key}: {e}")
                         yield key, None

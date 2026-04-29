@@ -9,6 +9,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from plotly.subplots import make_subplots
 from scipy import stats
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
@@ -33,14 +34,20 @@ def read_file(file_path: str = "monitoring_history.jsonl"):
 
 
 def get_available_tables(records):
-    grouped = defaultdict(set)
+    bq_grouped = defaultdict(set)
+    db_grouped = defaultdict(set)
     for record in records:
-        if "table_name" in record and "." in record["table_name"]:
-            schema, table = record["table_name"].split(".", 1)
-            grouped[schema].add(table)
-        elif "table_name" in record:
-            grouped["default"].add(record["table_name"])
-    return grouped
+        table_name = record.get("table_name", "")
+        parts = table_name.split(".")
+        if len(parts) == 3:
+            project, dataset, table = parts
+            bq_grouped[(project, dataset)].add(table)
+        elif len(parts) == 2:
+            schema, table = parts
+            db_grouped[schema].add(table)
+        elif table_name:
+            db_grouped["default"].add(table_name)
+    return bq_grouped, db_grouped
 
 
 def extract_historical_numerical_data(records, table_name, column_name):
@@ -92,7 +99,11 @@ def extract_historical_categorical_data(records, table_name, column_name):
     for record in records:
         if record.get("table_name") == table_name and column_name in record.get("metrics", {}):
             col_metrics = record["metrics"][column_name]
-            if col_metrics.get("detected_type") in ["categorical", "categorical_high_cardinality"]:
+            if col_metrics.get("detected_type") in [
+                "categorical",
+                "categorical_high_cardinality",
+                "unstructured_text",
+            ]:
                 timestamps.append(
                     datetime.fromisoformat(record["timestamp"].replace("Z", "+00:00"))
                 )
@@ -121,6 +132,28 @@ def extract_historical_bool_data(records, table_name, column_name):
                 value_counts_list.append(col_metrics.get("value_counts", {}))
 
     return timestamps, counts, nulls, value_counts_list
+
+
+def extract_historical_unstructured_text_data(records, table_name, column_name):
+    timestamps = []
+    avg_lengths = []
+    std_lengths = []
+    unique_values_list = []
+    uniqueness_ratio_list = []
+
+    for record in records:
+        if record.get("table_name") == table_name and column_name in record.get("metrics", {}):
+            col_metrics = record["metrics"][column_name]
+            if col_metrics.get("detected_type") == "unstructured_text":
+                timestamps.append(
+                    datetime.fromisoformat(record["timestamp"].replace("Z", "+00:00"))
+                )
+                avg_lengths.append(col_metrics.get("avg_character_length", 0))
+                std_lengths.append(col_metrics.get("std_character_length", 0))
+                unique_values_list.append(col_metrics.get("unique_values", 0))
+                uniqueness_ratio_list.append(col_metrics.get("uniqueness_ratio", 0))
+
+    return timestamps, avg_lengths, std_lengths, unique_values_list, uniqueness_ratio_list
 
 
 def filter_by_date(timestamps, *args, year=None, month=None, day=None):
@@ -604,17 +637,17 @@ def plot_categorical_drift(
         st.subheader(f"🔝 {column_name} - Top Categories Comparison")
 
         if len(top_labels_list) >= 2 and top_labels_list[0] and top_labels_list[-1]:
-            first_top = top_labels_list[-2]
+            previous_top = top_labels_list[-2]
             latest_top = top_labels_list[-1]
 
             latest_items = list(latest_top.items())[:5]
             categories = [item[0] for item in latest_items]
 
-            first_counts = [first_top.get(cat, 0) for cat in categories]
+            previous_counts = [previous_top.get(cat, 0) for cat in categories]
             latest_counts = [item[1] for item in latest_items]
 
             pct_changes = []
-            for first, latest in zip(first_counts, latest_counts):
+            for first, latest in zip(previous_counts, latest_counts):
                 if first > 0:
                     pct_change = ((latest - first) / first) * 100
                 else:
@@ -625,10 +658,10 @@ def plot_categorical_drift(
             fig.add_trace(
                 go.Bar(
                     x=categories,
-                    y=first_counts,
+                    y=previous_counts,
                     name=f"Baseline ({timestamps[-2].strftime('%Y-%m-%d')})",
                     marker_color="lightcoral",
-                    text=first_counts,
+                    text=previous_counts,
                     textposition="auto",
                 )
             )
@@ -668,17 +701,17 @@ def plot_categorical_drift(
                 else:
                     st.info(f"✅ **{cat}**: Stable ({pct:.1f}% change)")
 
-            all_categories = set(first_top.keys()) | set(latest_top.keys())
-            total_first = sum(first_top.values())
+            all_categories = set(previous_top.keys()) | set(latest_top.keys())
+            total_previous = sum(previous_top.values())
             total_latest = sum(latest_top.values())
 
-            dist_first = []
+            dist_previous = []
             dist_latest = []
             for cat in all_categories:
-                dist_first.append(first_top.get(cat, 0) / total_first if total_first > 0 else 0)
+                dist_previous.append(previous_top.get(cat, 0) / total_previous if total_previous > 0 else 0)
                 dist_latest.append(latest_top.get(cat, 0) / total_latest if total_latest > 0 else 0)
 
-            overall_jsd = calculate_js_divergence(dist_first, dist_latest)
+            overall_jsd = calculate_js_divergence(dist_previous, dist_latest)
 
             if overall_jsd < 0.05:
                 st.success(
@@ -704,7 +737,7 @@ def plot_categorical_drift(
             - Total categories tracked: {len(all_categories):,}
             """)
 
-            new_categories = set(latest_top.keys()) - set(first_top.keys())
+            new_categories = set(latest_top.keys()) - set(previous_top.keys())
             if new_categories:
                 with st.expander(f"🆕 New Top Categories Detected ({len(new_categories)})"):
                     st.write("New top categories found in latest snapshot:")
@@ -714,6 +747,85 @@ def plot_categorical_drift(
                         st.write(f"... and {len(new_categories) - 10} more")
         else:
             st.warning("No top labels data available for comparison")
+
+
+def plot_unstructured_text_drift(
+    timestamps, avg_lengths, std_lengths, unique_values_list, uniqueness_ratio_list, column_name
+):
+    if not timestamps or len(timestamps) < 2:
+        st.warning(f"Need at least 2 snapshots to calculate drift for {column_name}")
+        return
+
+    st.subheader(f" {column_name} - Avg. Text Length Over Time")
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=timestamps,
+            y=avg_lengths,
+            mode="markers",
+            name="Avg. Length",
+            marker=dict(size=8, color="blue"),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=timestamps,
+            y=std_lengths,
+            mode="markers",
+            name="Std. Length",
+            marker=dict(size=8, color="orange"),
+        )
+    )
+    fig.update_layout(
+        title="Average and Std. Text Length Over Time",
+        xaxis_title="Timestamp",
+        yaxis_title="Length",
+        height=400,
+        hovermode="x unified",
+    )
+    st.plotly_chart(fig, width="stretch")
+
+    st.subheader(f" {column_name} - Uniqueness Over Time")
+
+    fig2 = make_subplots(
+        rows=2,
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.1,
+        subplot_titles=("Unique Values", "Uniqueness Ratio"),
+    )
+
+    fig2.add_trace(
+        go.Scatter(
+            x=timestamps,
+            y=unique_values_list,
+            mode="markers",
+            name="Unique Values",
+            marker=dict(size=6, color="green"),
+        ),
+        row=1,
+        col=1,
+    )
+
+    fig2.add_trace(
+        go.Scatter(
+            x=timestamps,
+            y=uniqueness_ratio_list,
+            mode="markers",
+            name="Uniqueness Ratio",
+            marker=dict(size=6, color="purple"),
+        ),
+        row=2,
+        col=1,
+    )
+
+    fig2.update_layout(height=500, hovermode="x unified", showlegend=True)
+
+    fig2.update_yaxes(title_text="Count", row=1, col=1)
+    fig2.update_yaxes(title_text="Ratio (0-1)", row=2, col=1, range=[0, 1])
+    fig2.update_xaxes(title_text="Timestamp", row=2, col=1)
+
+    st.plotly_chart(fig2, width="stretch")
 
 
 def plot_date_drift(
@@ -899,24 +1011,57 @@ def main():
         return
 
     st.sidebar.header("🔍 Navigation")
-    available_tables = get_available_tables(records)
 
-    schemas = sorted(available_tables.keys())
-    selected_schema = st.sidebar.selectbox("Select Schema", schemas)
+    bq_grouped, db_grouped = get_available_tables(records)
+    db_types = []
+    if bq_grouped:
+        db_types.append("BigQuery")
+    if db_grouped:
+        db_types.append("Database")
 
-    tables = sorted(available_tables.get(selected_schema, set()))
-    selected_table = st.sidebar.selectbox("Select Table", tables)
+    if not db_types:
+        st.warning("No tables found.")
+        st.stop()
+    selected_db_type = st.sidebar.selectbox("Select Source Type", db_types)
 
-    full_table_name = f"{selected_schema}.{selected_table}"
+    if selected_db_type == "BigQuery":
+        projects = sorted(set(p for p, d in bq_grouped.keys()))
+        selected_project = st.sidebar.selectbox("Select Project", projects)
+        datasets = sorted(set(d for p, d in bq_grouped.keys() if p == selected_project))
+        selected_dataset = st.sidebar.selectbox("Select Dataset", datasets)
+        tables = sorted(bq_grouped[(selected_project, selected_dataset)])
+        selected_table = st.sidebar.selectbox("Select Table", tables)
+        full_table_name = f"{selected_project}.{selected_dataset}.{selected_table}"
+    elif selected_db_type == "Database":
+        schemas = sorted(db_grouped.keys())
+        selected_schema = st.sidebar.selectbox("Select Schema", schemas)
+        tables = sorted(db_grouped[selected_schema])
+        selected_table = st.sidebar.selectbox("Select Table", tables)
+        full_table_name = f"{selected_schema}.{selected_table}"
+    else:
+        st.warning("No tables found.")
+        st.stop()
 
-    st.sidebar.markdown("---")
-    st.sidebar.info(f"""
-    **Current Selection:**
-    - **Schema:** `{selected_schema}`
-    - **Table:** `{selected_table}`
-    """)
+        st.sidebar.markdown("---")
 
-    st.header(f"Table: {selected_table}")
+    if selected_db_type == "BigQuery":
+        st.sidebar.info(f"""
+        **Current Selection:**
+        - **Project:** `{selected_project}`
+        - **Dataset:** `{selected_dataset}`
+        - **Table:** `{selected_table}
+        """)
+    elif selected_db_type == "Database":
+        st.sidebar.info(f"""
+        **Current Selection:**
+        - **Schema:** `{selected_schema}`
+        - **Table:** `{selected_table}`
+        """)
+    else:
+        st.warning("No tables found.")
+        st.stop()
+
+        st.header(f"Table: {selected_table}")
 
     table_records = [r for r in records if r.get("table_name") == full_table_name]
 
@@ -950,7 +1095,21 @@ def main():
             )
             plot_numerical_drift(timestamps, bin_edges, expected_percents, selected_column)
 
-        elif detected_type in ["categorical", "categorical_high_cardinality", "unstructured_text"]:
+        elif detected_type == "unstructured_text":
+            timestamps, avg_lengths, std_lengths, unique_values_list, uniqueness_ratio_list = (
+                extract_historical_unstructured_text_data(
+                    table_records, full_table_name, selected_column
+                )
+            )
+            plot_unstructured_text_drift(
+                timestamps,
+                avg_lengths,
+                std_lengths,
+                unique_values_list,
+                uniqueness_ratio_list,
+                selected_column,
+            )
+        elif detected_type in ["categorical", "categorical_high_cardinality"]:
             timestamps, top_labels, uniqueness_ratio, unique_values = (
                 extract_historical_categorical_data(table_records, full_table_name, selected_column)
             )

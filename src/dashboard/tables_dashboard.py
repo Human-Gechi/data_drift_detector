@@ -708,7 +708,9 @@ def plot_categorical_drift(
             dist_previous = []
             dist_latest = []
             for cat in all_categories:
-                dist_previous.append(previous_top.get(cat, 0) / total_previous if total_previous > 0 else 0)
+                dist_previous.append(
+                    previous_top.get(cat, 0) / total_previous if total_previous > 0 else 0
+                )
                 dist_latest.append(latest_top.get(cat, 0) / total_latest if total_latest > 0 else 0)
 
             overall_jsd = calculate_js_divergence(dist_previous, dist_latest)

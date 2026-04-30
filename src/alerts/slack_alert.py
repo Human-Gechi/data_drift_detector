@@ -17,14 +17,14 @@ class Slack:
         self.tables = tables
 
     def send_notification(self):
-        from src.detect.drift_detector import check_and_alert
+        from src.detect.drift_detector import detect_drift
 
         client = WebClient(token=self.token)
 
         attempt = 0
         while attempt < _RETRIES:
             try:
-                drift_report = check_and_alert(file_path=self.file_path, table_names=self.tables)
+                drift_report = detect_drift(file_path=self.file_path, table_names=self.tables)
                 message = (
                     f"*Data Drift Alert*\n"
                     f"Timestamp: `{datetime.now().isoformat()}`\n"

@@ -7,7 +7,7 @@ from scipy.stats import chi2_contingency, norm
 from statsmodels.stats.proportion import proportions_ztest
 
 
-def get_latest_two_hashes(file_path, table_names):
+def _get_latest_two_hashes(file_path, table_names):
     results = defaultdict(list)
     target_set = set(table_names)
 
@@ -46,7 +46,7 @@ def get_latest_two_hashes(file_path, table_names):
     return comparison
 
 
-def detect_drift_in_history(file_path: str, alpha: float = 0.05, base_psi: float = 0.20):
+def _detect_drift_in_history(file_path: str, alpha: float = 0.05, base_psi: float = 0.20):
 
     table_entries = defaultdict(list)
 
@@ -207,8 +207,8 @@ def detect_drift_in_history(file_path: str, alpha: float = 0.05, base_psi: float
     return drift_report
 
 
-def check_and_alert(file_path, table_names, alpha=0.05):
-    hashes = get_latest_two_hashes(file_path, table_names)
+def detect_drift(file_path, table_names, alpha=0.05):
+    hashes = _get_latest_two_hashes(file_path, table_names)
     tables_with_change = [t for t, (latest, prev) in hashes.items() if latest != prev]
 
     if not tables_with_change:
@@ -219,7 +219,7 @@ def check_and_alert(file_path, table_names, alpha=0.05):
         "Running statistical drift detection"
     )
 
-    drift_report = detect_drift_in_history(file_path, alpha)
+    drift_report = _detect_drift_in_history(file_path, alpha)
     messages = []
 
     for table, report in drift_report.items():

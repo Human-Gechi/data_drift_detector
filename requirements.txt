@@ -8,4 +8,4 @@ snowflake-connector-python==4.4.0
 google-auth==2.49.2
 ruff==0.15.10
 google-cloud-bigquery-storage==2.37.0
-db-dtype==
+db-dtypes==1.17.0

@@ -30,7 +30,7 @@ class DatabaseConnectionError(Exception):
 
 
 @dataclass
-class MySQLConnector:
+class MySQLConn:
     host: str
     port: int
     user: str

@@ -42,3 +42,6 @@ line-ending = "lf"
 
 [tool.ruff.lint]
 select = ["E", "I"]
+
+[project.scripts]
+data_drift_detector = "src.cli:app"

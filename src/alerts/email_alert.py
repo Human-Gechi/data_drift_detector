@@ -21,7 +21,7 @@ class Email:
         self.receiver_email = receiver_email
         self.sender_password = sender_password
         self.smtp_server = "smtp.gmail.com"
-        self.smtp_port = 587
+        self.smtp_port = 465
         self.file_path = "monitoring_history.jsonl"
         self.tables = tables
 
@@ -32,9 +32,9 @@ class Email:
         )
 
     def send_email(self, subject=_EMAIL_SUBJECT, html_body: str = None):
-        from src.detect.drift_detector import check_and_alert
+        from src.detect.drift_detector import detect_drift
 
-        drift_report = check_and_alert(self.file_path, self.tables)
+        drift_report = detect_drift(self.file_path, self.tables)
 
         template = self.env.get_template("drift_alert.html")
         html_body = template.render(timestamp=datetime.now().isoformat(), drift_report=drift_report)
@@ -49,13 +49,14 @@ class Email:
         attempt = 0
         while attempt < _RETRIES:
             try:
-                with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                    server.starttls()
+                with smtplib.SMTP_SSL(self.smtp_server, self.smtp_port) as server:
                     server.login(self.sender_email, self.sender_password)
                     server.sendmail(self.sender_email, self.receiver_email, message.as_string())
                 print(f"✅ Email successfully sent to {self.receiver_email}")
+                break
             except Exception as e:
                 attempt += 1
                 print(f"Attempt {attempt} failed: {e}")
                 time.sleep(_BASE * attempt)
-        print(f"Failed to send email after {_RETRIES} retries")
+        else:
+            print(f"Failed to send email after {_RETRIES} retries")

@@ -7,3 +7,5 @@ hashes.jsonl
 monitoring_history.jsonl
 .env
 meta-spirit-494622-f5-82b375b04e9e.json
+.mycli_conn.json
+params.yaml

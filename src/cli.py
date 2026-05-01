@@ -1,3 +1,6 @@
+import subprocess
+import sys
+
 import typer
 from prompt_toolkit import PromptSession
 from rich import print
@@ -123,6 +126,7 @@ def configure():
         "sender": typer.prompt("Sender email address") if email_enabled else "",
         "recipient": typer.prompt("Recipient email address") if email_enabled else "",
         "password": typer.prompt("Sender email password", hide_input=True) if email_enabled else "",
+        "smtp_port": typer.prompt("Enter SMTP server port", default=465) if email_enabled else "",
     }
 
     slack_config = {
@@ -139,24 +143,33 @@ def configure():
     params["tables"] = tables
 
     save_conn_params(params)
-    print("[green]Connection established.[/green]")
+    typer.secho("Connection established.", fg=typer.colors.BRIGHT_GREEN)
 
 
 @app.command()
-def monitoring(
-    output_file: str = Option(
-        "monitoring_history.jsonl", help="Output file for monitoring history"
-    ),
-    table_names: list[str] = Option(None, help="List of table names"),
-    schemas: list[str] = Option(None, help="List of schemas"),
-    datasets: list[str] = Option(None, help="List of datasets"),
-    timeout: int = Option(600, help="Session timeout in seconds"),
-):
+def monitoring():
     from src.detect.monitoring import append_profiles_hash
+
+    output_file = typer.prompt(
+        "Output file for monitoring history", default="monitoring_history.jsonl"
+    )
+    table_names_input = typer.prompt(
+        "Comma-separated list of table names (leave blank for all)", default=""
+    )
+    table_names = [t.strip() for t in table_names_input.split(",") if t.strip()]
+    schemas_input = typer.prompt(
+        "Comma-separated list of schemas (leave blank for all)", default=""
+    )
+    schemas = [s.strip() for s in schemas_input.split(",") if s.strip()]
+    datasets_input = typer.prompt(
+        "Comma-separated list of datasets (leave blank for all)", default=""
+    )
+    datasets = [d.strip() for d in datasets_input.split(",") if d.strip()]
+    timeout = typer.prompt("Session timeout in seconds", default=600, type=int)
 
     params = load_conn_params()
     if not params:
-        typer.echo("Run 'configure' first")
+        typer.secho("Run 'configure' first", fg=typer.colors.RED)
         raise typer.Exit()
 
     global timed_conn
@@ -182,9 +195,9 @@ def monitoring(
                 connector=connector,
                 conn=conn,
                 output_file=output_file,
-                table_names=table_names,
-                schemas=schemas,
-                datasets=datasets,
+                table_names=table_names if table_names else None,
+                schemas=schemas if schemas else None,
+                datasets=datasets if datasets else None,
             )
             print(result)
         progress.stop_task(monitor_task)
@@ -211,9 +224,9 @@ def detect_drift():
 
 @app.command()
 def dashboard():
-    from src.dashboard import main
-
-    pass
+    """Launch the Streamlit dashboard in the background."""
+    subprocess.Popen([sys.executable, "-m", "streamlit", "run", "src/dashboard/main.py"])
+    typer.secho("Dashboard started in the background.", fg=typer.colors.BRIGHT_GREEN)
 
 
 def main_shell():

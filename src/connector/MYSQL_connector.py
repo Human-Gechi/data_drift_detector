@@ -40,7 +40,11 @@ class MySQLConn:
     def __enter__(self):
         try:
             self.conn = MySQLdb.connect(
-                host=self.host, port=self.port, user=self.user, password=self.password, db=self.db
+                host=self.host,
+                port=self.port,
+                user=self.user,
+                password=self.password,
+                database=self.database,
             )
             return self.conn
         except (

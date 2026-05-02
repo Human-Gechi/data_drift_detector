@@ -15,6 +15,7 @@ st.title("Data Drift overview")
 
 
 def count_dtypes_for_table(records, table_name):
+    """Count data types avaialble in each table using Counter()"""
     for record in records:
         if record.get("table_name") == table_name:
             metrics = record.get("metrics", {})
@@ -24,6 +25,7 @@ def count_dtypes_for_table(records, table_name):
 
 
 def nulls_count_tables(records, table_name):
+    "Function to count all nulls across columns in a table "
     table_records = [r for r in records if r.get("table_name") == table_name]
     if not table_records:
         return {}
@@ -34,6 +36,7 @@ def nulls_count_tables(records, table_name):
 
 
 def plot_piechart(records, selected_table, full_table_name):
+    """Create a pie chart showing the proportion of each data type (numerical, boolean, date, categorical, categorical_high_cardinality, unstructured_text) in a table's columns."""
     if selected_table:
         dtype_counts = count_dtypes_for_table(records, full_table_name)
 
@@ -64,6 +67,9 @@ def plot_piechart(records, selected_table, full_table_name):
 
 
 def plot_nulls(records, selected_table, full_table_name):
+    """
+    Plot a heatmap visualizing null value distribution across table columns.
+    """
     if selected_table:
         null_counts = nulls_count_tables(records, full_table_name)
         if null_counts:
@@ -87,6 +93,17 @@ def plot_nulls(records, selected_table, full_table_name):
 
 
 def plot_check_tables(records):
+    """
+    Generate a scatter plot showing the distribution of table check times throughout the monitoring period.
+
+    Helps identify:
+    - Which tables were checked frequently or infrequently
+    - Time gaps between checks
+    - Overall monitoring coverage
+
+    Args:
+        records
+    """
     st.subheader("Update Timeline")
     timestamps_all = []
     valid_records = []

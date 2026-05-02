@@ -6,7 +6,8 @@ import pandas as pd
 
 from log import get_ingest_logger
 
-PG_TO_PANDAS_MAP = {
+#Mapping datatypes
+MYSQL_TO_PANDAS_MAP = {
     "integer": "Int64",
     "bigint": "Int64",
     "smallint": "Int64",
@@ -37,7 +38,45 @@ class MySQLConn:
     password: str
     database: str
 
+    """MYSQL connection handler with context manager support and profiling utilities.
+
+    Manages MYSQL connections, authentication, and provides helper methods
+    for table and schema operations, column profiling by data type, and hash-based
+    table comparison.
+
+    Features:
+        - Context manager support (__enter__/__exit__) for automatic connection cleanup
+        - group tables by data type
+        - Fetch all the tables in a particular schema
+        - Check table existence
+        - Table hash calculation using CHECKSUM for table hashing
+        - Automatic grouping of columns by data type (numerical, text, date, bool)
+        - Batched data retrieval for tables
+
+    Attributes:
+            host: str -> MySQL host
+            port: int -> MySQL port
+            user: str -> MySQL username
+            password: str -> MySQL password
+            database: str -> MySQL database name
+            conn (mysql.connector.MySQLConnection): MySQL connection instance (created in __enter__)
+    Example:
+        with MySQLConn(host='your-host', port=1000, user='your-username', password='your-paswword', database='your-db-name') as conn:
+            exists = MYSQLConn.table_exists(conn, 'my_schema', 'my_table')
+
+    Raises:
+        DatabaseConnectionError: If credentials file not found or connection fails
+    """
+
+
     def __enter__(self):
+        """Establish MySQL connection and return conn instance.
+        Returns:
+            MySQLdb.connect: Authenticated MySQL connection
+
+        Raises:
+            DatabaseConnectionError: If Programming, Interface, Database, Operational Error
+        """
         try:
             self.conn = MySQLdb.connect(
                 host=self.host,
@@ -58,6 +97,9 @@ class MySQLConn:
             raise DatabaseConnectionError(f"An unexpected error occurred: {e}") from e
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """Close MySQL connection on context manager exit.
+        Ensures proper cleanup of connection resources when exiting the with block.
+        """
         if hasattr(self, "conn"):
             try:
                 self.conn.close()
@@ -268,7 +310,7 @@ class MySQLConn:
             for (sch, table), group_cols in groups.items():
                 raw_cols = table_info.get((sch, table), [])
                 table_dtype_map = {
-                    col: PG_TO_PANDAS_MAP.get(dtype.lower(), "object") for col, dtype in raw_cols
+                    col: MYSQL_TO_PANDAS_MAP.get(dtype.lower(), "object") for col, dtype in raw_cols
                 }
 
                 for group, columns in group_cols.items():

@@ -18,7 +18,11 @@ slack_client = None
 
 
 def create_connector_and_params(params):
-    """Connection Params for DB/DATA WAREHOUSE"""
+    """
+    Instantiate connector parameters for database and data warehouse connections.
+
+    Supported connectors include MySQL, PostgreSQL, BigQuery, and Snowflake.
+    """
     conn_type = params["type"]
     if conn_type == "bigquery":
         from src.connector.bigquery_connector import BigQueryConn
@@ -67,7 +71,7 @@ def create_connector_and_params(params):
 
 
 def setup_alert_clients(tables=None):
-    """Setup email alerting for drift detection."""
+    """Configure email alerts for data drift detection."""
     from src.alerts.email_alert import Email
     from src.alerts.slack_alert import Slack
 
@@ -90,7 +94,15 @@ def setup_alert_clients(tables=None):
 
 @app.command()
 def configure():
-    """Configure connection params"""
+    """
+    Initialize all connection configurations for the application.
+
+    This includes:
+    - Database/Data warehouse connections (host, port, credentials, etc.)
+    - Email alerting setup (SMTP, recipients, etc.)
+
+    Run this command at startup before any data operations.
+    """
     conn_type = typer.prompt("Connection type (snowflake, bigquery, mysql, postgres)")
     params = {"type": conn_type}
     if conn_type == "bigquery":
@@ -243,7 +255,7 @@ def dashboard():
 
 
 def main_shell():
-    """Main Function for CLI runs"""
+    """Main Function for CLI runs."""
     session = PromptSession()
     typer.secho(
         "Welcome to Data Drift Detector shell! Type 'exit' or 'quit' to exit cli",
@@ -283,7 +295,7 @@ def main_shell():
             typer.secho(f"Error: {e}", fg=typer.colors.RED)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__": #Entry point
     import sys
 
     if len(sys.argv) > 1:

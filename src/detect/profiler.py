@@ -5,6 +5,30 @@ import pandas as pd
 
 
 class SummaryStats:
+    """Base column profiling class for analyzing distributions according to data types.
+
+    This class provides foundational profiling capabilities for columns based on their
+    detected data type. Contains four static methods, each specialized for a specific
+    data type:
+
+    Static Methods:
+        profile_numeric(df, num_bins)
+            Computes bin edges, expected percentages, and statistical distributions
+            for numerical columns (integers, floats).
+
+        profile_bool(df)
+            Analyzes boolean distributions counts, unique_counts
+            nulls, and value frequencies.
+
+        profile_text(df)
+
+
+        profile_date(df)
+
+    Each method returns a standardized metrics dictionary compatible with the
+    base column profiling format.
+    """
+
     @staticmethod
     def profile_numeric(df: pd.DataFrame, num_bins=5) -> str:
         df = df.apply(pd.to_numeric, errors="coerce")
@@ -136,7 +160,6 @@ class SummaryStats:
 
             if detected_type.startswith("categorical"):
                 full_counts = series.value_counts().to_dict()
-                stats[col]["full_counts"] = full_counts
                 stats[col]["top_labels"] = dict(list(full_counts.items())[:5])
 
             if detected_type == "unstructured_text":

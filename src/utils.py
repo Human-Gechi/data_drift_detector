@@ -3,7 +3,7 @@ import time
 
 class TimedConnection:
     def __init__(self, conn, timeout=600):
-        self.conn = (conn,)
+        self.conn = conn
         self.created_at = time.time()
         self.timeout = timeout
 

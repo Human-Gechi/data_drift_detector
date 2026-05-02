@@ -207,51 +207,100 @@ def _detect_drift_in_history(file_path: str, alpha: float = 0.05, base_psi: floa
     return drift_report
 
 
-def detect_drift(file_path, table_names, alpha=0.05):
-    hashes = _get_latest_two_hashes(file_path, table_names)
-    tables_with_change = [t for t, (latest, prev) in hashes.items() if latest != prev]
+def resolve_table_names(file_path, user_tables):
+    if isinstance(user_tables, str):
+        user_tables = [user_tables]
 
-    if not tables_with_change:
-        return "✅ No hash changes. No drift likely."
+    mapping = {}
+    with open(file_path, "r") as f:
+        for line in f:
+            records = json.loads(line)
+            full_name = records.get("table_name")
+            if not full_name:
+                continue
+            simple_name = full_name.split(".")[-1]
+            mapping.setdefault(simple_name, set()).add(full_name)
+            mapping.setdefault(full_name, set()).add(full_name)
 
-    print(
-        f"🔍Hash changes detected for table: {tables_with_change}. "
-        "Running statistical drift detection"
-    )
-
-    drift_report = _detect_drift_in_history(file_path, alpha)
-    messages = []
-
-    for table, report in drift_report.items():
-        if table not in tables_with_change:
-            continue
-        if report.get("hash_match"):
-            continue
-
-        columns = report.get("columns", {})
-        drifted = [
-            col
-            for col, val in columns.items()
-            if isinstance(val, dict) and val.get("drift") is True
-        ]
-        disappeared = [col for col, val in columns.items() if val == "disappeared_column"]
-        new_cols = [col for col, val in columns.items() if val == "new_column"]
-        bin_mismatch = [col for col, val in columns.items() if val == "bin_mismatch"]
-
-        if drifted or disappeared or new_cols or bin_mismatch:
-            msg = f"🚨 DRIFT in {table}:"
-            if drifted:
-                msg += f"\n  - Drifted columns: {drifted}"
-            if disappeared:
-                msg += f"\n  - Disappeared columns: {disappeared}"
-            if new_cols:
-                msg += f"\n  - New columns: {new_cols}"
-            if bin_mismatch:
-                msg += f"\n  - Bin mismatch columns: {bin_mismatch}"
-            messages.append(msg)
+    resolved = set()
+    for name in user_tables:
+        if name in mapping:
+            resolved.update(mapping[name])
         else:
+            print(f"Warning: Table '{name}' not found in monitoring history.")
+    return list(resolved)
+
+
+def detect_drift(file_path, table_names, alpha=0.05, base_psi: float = 0.20):
+    resolved_table_names = resolve_table_names(file_path, table_names)
+    if not resolved_table_names:
+        return "No matching tables found in monitoring history."
+
+    hashes = _get_latest_two_hashes(file_path, resolved_table_names)
+    tables_with_change = {t for t, (latest, prev) in hashes.items() if latest != prev}
+    tables_without_change = set(resolved_table_names) - tables_with_change
+
+    print(f"🔍Running data drift detection............")
+    print(f"   Tables with hash changes: {len(tables_with_change)}")
+    print(f"   Tables without hash changes: {len(tables_without_change)}")
+
+    drift_report = _detect_drift_in_history(file_path, alpha, base_psi)
+
+    messages = []
+    if tables_without_change:
+        bullet = "\n   • ".join(sorted(tables_without_change))
+        messages.append(f"✅ No hash changes detected in:\n   • {bullet}\n   ✨ No drift likely.\n")
+
+    if tables_with_change:
+        drift_summary = {}
+        for table in tables_with_change:
+            if table in drift_report:
+                report = drift_report[table]
+                columns = report.get("columns", {})
+                drift_summary[table] = {
+                    "drifted": [
+                        col
+                        for col, val in columns.items()
+                        if isinstance(val, dict) and val.get("drift")
+                    ],
+                    "disappeared": [
+                        col for col, val in columns.items() if val == "disappeared_column"
+                    ],
+                    "new_cols": [col for col, val in columns.items() if val == "new_column"],
+                    "bin_mismatch": [col for col, val in columns.items() if val == "bin_mismatch"],
+                }
+            else:
+                drift_summary[table] = {
+                    "drifted": [],
+                    "disappeared": [],
+                    "new_cols": [],
+                    "bin_mismatch": [],
+                }
+
+        tables_with_actual_drift = {
+            t
+            for t, info in drift_summary.items()
+            if any([info["drifted"], info["disappeared"], info["new_cols"], info["bin_mismatch"]])
+        }
+        tables_without_drift = set(drift_summary.keys()) - tables_with_actual_drift
+
+        if tables_without_drift:
+            bullet = "\n   • ".join(sorted(tables_without_drift))
             messages.append(
-                f"⚠️ Hash changed for {table} but no statistical drift detected(maybe minor changes)"
+                f"⚠️ Hash changed but no statistical drift detected for:\n   • {bullet} \n"
             )
 
-    return "\n".join(messages) if messages else None
+        for table in tables_with_actual_drift:
+            info = drift_summary[table]
+            msg = f"🚨 DRIFT in {table}:"
+            if info["drifted"]:
+                msg += f"\n  - Drifted columns: {info['drifted']}"
+            if info["disappeared"]:
+                msg += f"\n  - Disappeared columns: {info['disappeared']}"
+            if info["new_cols"]:
+                msg += f"\n  - New columns: {info['new_cols']}"
+            if info["bin_mismatch"]:
+                msg += f"\n  - Bin mismatch columns: {info['bin_mismatch']}"
+            messages.append(msg)
+
+    return "\n".join(messages) if messages else "No tables to report."

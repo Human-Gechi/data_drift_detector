@@ -927,16 +927,7 @@ def plot_date_drift(
         )
 
 
-def plot_bool_drift(
-    timestamps,
-    counts,
-    nulls,
-    value_counts_list,
-    column_name,
-    selected_year=None,
-    selected_month=None,
-    selected_days=None,
-):
+def plot_bool_drift(timestamps, counts, nulls, value_counts_list, column_name):
     all_keys = set()
     for vc in value_counts_list:
         all_keys.update(vc.keys())

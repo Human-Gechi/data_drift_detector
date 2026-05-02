@@ -27,7 +27,7 @@
     <div class="header">DATA DRIFT ALERT</div>
     <div class="timestamp"><b>Timestamp: {{ timestamp }}</b></div>
     <div class="content">
-        <p><b>Drift detected in the following tables:</b></p>
+        <p><b>Data Drift Detection Summary</b></p>
         <div class="drift-report">{{ drift_report | replace('\n', '<br>') | safe }}</div>
     </div>
 </body>

@@ -15,14 +15,14 @@ _BASE = 1
 
 class Email:
     def __init__(
-        self, sender_email: str, receiver_email: str, sender_password: str, tables: List[str]
+        self, sender_email: str, receiver_email: str, sender_password: str, tables: List[str], file_path: str = None
     ):
         self.sender_email = sender_email
         self.receiver_email = receiver_email
         self.sender_password = sender_password
         self.smtp_server = "smtp.gmail.com"
         self.smtp_port = 465
-        self.file_path = "monitoring_history.jsonl"
+        self.file_path = file_path or "monitoring_history.jsonl"
         self.tables = tables
 
         template_dir = os.path.join(os.path.dirname(__file__), "templates")

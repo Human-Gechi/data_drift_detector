@@ -10,10 +10,10 @@ _BASE = 1
 
 
 class Slack:
-    def __init__(self, token: str, channel: str, tables: List[str] = None):
+    def __init__(self, token: str, channel: str, tables: List[str] = None, file_path: str = None):
         self.token = token
         self.channel = channel
-        self.file_path = "monitoring_history.jsonl"
+        self.file_path = file_path or "monitoring_history.jsonl"
         self.tables = tables
 
     def send_notification(self):

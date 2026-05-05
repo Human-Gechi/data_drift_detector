@@ -6,7 +6,7 @@ import pandas as pd
 
 from log import get_ingest_logger
 
-#Mapping datatypes
+# Mapping datatypes
 MYSQL_TO_PANDAS_MAP = {
     "integer": "Int64",
     "bigint": "Int64",
@@ -61,13 +61,13 @@ class MySQLConn:
             database: str -> MySQL database name
             conn (mysql.connector.MySQLConnection): MySQL connection instance (created in __enter__)
     Example:
-        with MySQLConn(host='your-host', port=1000, user='your-username', password='your-paswword', database='your-db-name') as conn:
+        with MySQLConn(host='your-host', port=1000, user='your-username', password='your-paswword', 
+            database='your-db-name') as conn:
             exists = MYSQLConn.table_exists(conn, 'my_schema', 'my_table')
 
     Raises:
         DatabaseConnectionError: If credentials file not found or connection fails
     """
-
 
     def __enter__(self):
         """Establish MySQL connection and return conn instance.

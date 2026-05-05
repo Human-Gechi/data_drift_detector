@@ -33,6 +33,7 @@ class Slack:
                 )
                 response = client.chat_postMessage(channel=self.channel, text=message)
                 print("✅ Slack notification sent")
+                break
             except SlackApiError as e:
                 attempt += 1
                 print(f"Error sending message: {e.response['error']}")

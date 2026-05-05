@@ -25,7 +25,7 @@ def count_dtypes_for_table(records, table_name):
 
 
 def nulls_count_tables(records, table_name):
-    "Function to count all nulls across columns in a table "
+    "Function to count all nulls across columns in a table"
     table_records = [r for r in records if r.get("table_name") == table_name]
     if not table_records:
         return {}
@@ -36,7 +36,9 @@ def nulls_count_tables(records, table_name):
 
 
 def plot_piechart(records, selected_table, full_table_name):
-    """Create a pie chart showing the proportion of each data type (numerical, boolean, date, categorical, categorical_high_cardinality, unstructured_text) in a table's columns."""
+    """
+    Create a pie chart showing the proportion of each data type (numerical, boolean, date,
+    categorical, categorical_high_cardinality, unstructured_text) in a table's columns."""
     if selected_table:
         dtype_counts = count_dtypes_for_table(records, full_table_name)
 
@@ -94,7 +96,8 @@ def plot_nulls(records, selected_table, full_table_name):
 
 def plot_check_tables(records):
     """
-    Generate a scatter plot showing the distribution of table check times throughout the monitoring period.
+    Generate a scatter plot showing the distribution of table check times
+    throughout the monitoring period.
 
     Helps identify:
     - Which tables were checked frequently or infrequently

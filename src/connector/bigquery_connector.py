@@ -108,12 +108,12 @@ class BigQueryConn:
 
     def dataset_exists(self, conn, dataset: str) -> bool:
         """Check if a dataset exists in the connected project.
-            Args:
-                conn (bigquery.Client): Active BigQuery connection
-                dataset (str): Dataset name
+        Args:
+            conn (bigquery.Client): Active BigQuery connection
+            dataset (str): Dataset name
 
-            Returns:
-                bool: True if dataset exists, False otherwise
+        Returns:
+            bool: True if dataset exists, False otherwise
         """
         try:
             conn.get_dataset(f"{conn.project}.{dataset}")
@@ -125,13 +125,13 @@ class BigQueryConn:
 
     def table_exists(self, conn, dataset: str, table_name: str) -> bool:
         """Check if a table exists in the connected project.
-            Args:
-                conn (bigquery.Client): Active BigQuery connection
-                dataset (str): Dataset name
-                table (str): Table name
+        Args:
+            conn (bigquery.Client): Active BigQuery connection
+            dataset (str): Dataset name
+            table (str): Table name
 
-            Returns:
-                bool: True if table exists, False otherwise
+        Returns:
+            bool: True if table exists, False otherwise
         """
         try:
             table_ref = f"{conn.project}.{dataset}.{table_name}"
@@ -194,20 +194,20 @@ class BigQueryConn:
     def group_columns_by_type(self, conn, dataset: str, table_name: str) -> Dict[str, List[str]]:
         """Group table columns by their BigQuery data type categories.
 
-            Categorizes columns into four profiling groups:
-                - numerical: int64, numeric, decimal, float64, etc.
-                - text: string
-                - date: date, timestamp, datetime, time
-                - bool: boolean, bool
+        Categorizes columns into four profiling groups:
+            - numerical: int64, numeric, decimal, float64, etc.
+            - text: string
+            - date: date, timestamp, datetime, time
+            - bool: boolean, bool
 
-            Args:
-                conn (bigquery.Client): Active BigQuery connection
-                dataset (str): Dataset name
-                table_name (str): Table name
+        Args:
+            conn (bigquery.Client): Active BigQuery connection
+            dataset (str): Dataset name
+            table_name (str): Table name
 
-            Returns:
-                Dict[str, List[str]]: Dictionary with keys 'numerical', 'text', 'date', 'bool'
-                each containing list of column names. Returns empty lists on error.
+        Returns:
+            Dict[str, List[str]]: Dictionary with keys 'numerical', 'text', 'date', 'bool'
+            each containing list of column names. Returns empty lists on error.
         """
         numerical_types = {
             "int64",
@@ -249,15 +249,15 @@ class BigQueryConn:
     def available_dtypes(self, conn, dataset: str, table_name: str) -> Optional[set]:
         """Get unique set of BigQuery data types present in a table's schema.
 
-            Args:
-                conn (bigquery.Client): Active BigQuery connection
-                dataset (str): Dataset name
-                table_name (str): Table name
+        Args:
+            conn (bigquery.Client): Active BigQuery connection
+            dataset (str): Dataset name
+            table_name (str): Table name
 
-            Returns:
-                Optional[set]: Set of field_type strings (e.g., {'STRING', 'INT64', 'DATE'})
-                    Returns None if table/dataset doesn't exist or schema inaccessible
-    """
+        Returns:
+            Optional[set]: Set of field_type strings (e.g., {'STRING', 'INT64', 'DATE'})
+                Returns None if table/dataset doesn't exist or schema inaccessible
+        """
         if not (
             self.table_exists(conn, dataset, table_name) and self.dataset_exists(conn, dataset)
         ):
@@ -280,23 +280,23 @@ class BigQueryConn:
     ) -> Generator[Tuple[str, pd.DataFrame], None, None]:
         """Retrieve column data in batches grouped by type for profiling.
 
-            Fetches data from specified tables, grouping columns by their data type category
-            (numerical, text, date, boolean). Yields each group as a DataFrame using batched
-            queries to handle large tables efficiently.
-            Skips tables that don't exist or have no data for a column group.
+        Fetches data from specified tables, grouping columns by their data type category
+        (numerical, text, date, boolean). Yields each group as a DataFrame using batched
+        queries to handle large tables efficiently.
+        Skips tables that don't exist or have no data for a column group.
 
-            Args:
-                conn (bigquery.Client): Active BigQuery connection
-                datasets (List[str]): List of dataset names
-                table_names (List[str]): List of table names to process
-                batch_size (int): Number of rows per query batch (default: 50000)
-                location (Optional[str]): Override dataset location (uses dataset location if None)
+        Args:
+            conn (bigquery.Client): Active BigQuery connection
+            datasets (List[str]): List of dataset names
+            table_names (List[str]): List of table names to process
+            batch_size (int): Number of rows per query batch (default: 50000)
+            location (Optional[str]): Override dataset location (uses dataset location if None)
 
-            Yields:
-                Generator[Tuple[str, pd.DataFrame], None, None]: Tuple of (key, DataFrame)
-                    where key format is "project.dataset.table.group" and DataFrame contains
-                    the grouped columns' data.
-    """
+        Yields:
+            Generator[Tuple[str, pd.DataFrame], None, None]: Tuple of (key, DataFrame)
+                where key format is "project.dataset.table.group" and DataFrame contains
+                the grouped columns' data.
+        """
         datasets_by_location = defaultdict(list)
         for dataset in datasets:
             resolved_location = location or self.get_dataset_location(conn, dataset)

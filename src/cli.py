@@ -295,7 +295,7 @@ def main_shell():
             typer.secho(f"Error: {e}", fg=typer.colors.RED)
 
 
-if __name__ == "__main__": #Entry point
+if __name__ == "__main__":  # Entry point
     import sys
 
     if len(sys.argv) > 1:

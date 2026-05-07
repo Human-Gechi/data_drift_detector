@@ -124,7 +124,7 @@ class PostgresConn:
             grouped = {}
 
             for (schema, table), columns in table_info.items():
-                groups = {"numerical": [], "text": [], "date": [], "bool": []}
+                groups = {"numerical": [], "text": [], "date": [], "boolean": []}
                 for col, dtype in columns:
                     dtype_l = dtype.lower()
                     if dtype_l in numerical_types:

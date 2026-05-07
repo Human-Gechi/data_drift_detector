@@ -43,7 +43,7 @@ class PostgresConn:
                 port=self.port,
                 user=self.user,
                 password=self.password,
-                dbname=self.database,
+                database=self.database,
             )
             return self.conn
         except (

@@ -141,10 +141,10 @@ class SummaryStats:
             lengths = series.str.len()
             avg_length = lengths.mean()
 
-            if unique_ratio < 0.20 or unique_count < 25:
-                detected_type = "categorical"
-            elif avg_length > 30:
+            if avg_length > 30:
                 detected_type = "unstructured_text"
+            elif unique_ratio < 0.20 or unique_count < 25:
+                detected_type = "categorical"
             else:
                 detected_type = "categorical_high_cardinality"
 

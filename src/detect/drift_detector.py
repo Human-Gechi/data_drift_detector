@@ -207,7 +207,7 @@ def _detect_drift_in_history(file_path: str, alpha: float = 0.05, base_psi: floa
     return drift_report
 
 
-def resolve_table_names(file_path, user_tables):
+def _resolve_table_names(file_path, user_tables):
     if isinstance(user_tables, str):
         user_tables = [user_tables]
 
@@ -232,7 +232,7 @@ def resolve_table_names(file_path, user_tables):
 
 
 def detect_drift(file_path, table_names, alpha=0.05, base_psi: float = 0.20):
-    resolved_table_names = resolve_table_names(file_path, table_names)
+    resolved_table_names = _resolve_table_names(file_path, table_names)
     if not resolved_table_names:
         return "No matching tables found in monitoring history."
 

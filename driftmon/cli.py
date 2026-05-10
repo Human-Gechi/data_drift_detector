@@ -7,8 +7,8 @@ from rich import print
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from typer import Typer
 
-from src.config import load_conn_params, save_conn_params
-from src.utils import TimedConnection
+from driftmon.config import load_conn_params, save_conn_params
+from driftmon.utils import TimedConnection
 
 app = Typer()
 timed_conn = None
@@ -25,14 +25,14 @@ def create_connector_and_params(params):
     """
     conn_type = params["type"]
     if conn_type == "bigquery":
-        from src.connector.bigquery_connector import BigQueryConn
+        from driftmon.connector.bigquery_connector import BigQueryConn
 
         connector = BigQueryConn(
             project=params["project"], credentials_path=params["credentials_path"]
         )
         return connector
     elif conn_type == "snowflake":
-        from src.connector.snowflake_connector import SnowflakeConn
+        from driftmon.connector.snowflake_connector import SnowflakeConn
 
         connector = SnowflakeConn(
             user=params["user"],
@@ -45,7 +45,7 @@ def create_connector_and_params(params):
         )
         return connector
     elif conn_type == "postgres":
-        from src.connector.postgres_connector import PostgresConn
+        from driftmon.connector.postgres_connector import PostgresConn
 
         connector = PostgresConn(
             host=params["host"],
@@ -56,7 +56,7 @@ def create_connector_and_params(params):
         )
         return connector
     elif conn_type == "mysql":
-        from src.connector.mysql_connector import MySQLConn
+        from driftmon.connector.mysql_connector import MySQLConn
 
         connector = MySQLConn(
             host=params["host"],
@@ -72,8 +72,8 @@ def create_connector_and_params(params):
 
 def setup_alert_clients(tables=None):
     """Configure email alerts for data drift detection."""
-    from src.alerts.email_alert import Email
-    from src.alerts.slack_alert import Slack
+    from driftmon.alerts.email_alert import Email
+    from driftmon.alerts.slack_alert import Slack
 
     global email_client, slack_client
     alert_config = load_conn_params()
@@ -171,7 +171,7 @@ def configure():
 @app.command()
 def monitoring():
     """Append Baseline stats profiling to jsonl file"""
-    from src.detect.monitoring import save_profile
+    from driftmon.detect.monitoring import save_profile
 
     params = load_conn_params()
     if not params:
@@ -276,7 +276,7 @@ def main_shell():
     typer.secho("  exit/quit      - Quit the shell\n", fg=typer.colors.YELLOW)
     while True:
         try:
-            text = session.prompt("ddf> ")
+            text = session.prompt("ddd> ")
             if text.strip() in {"exit", "quit"}:
                 typer.secho("Goodbye!", fg=typer.colors.BRIGHT_YELLOW)
                 break

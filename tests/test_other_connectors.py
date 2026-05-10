@@ -3,9 +3,9 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from src.connector.mysql_connector import MySQLConn
-from src.connector.postgres_connector import PostgresConn
-from src.connector.snowflake_connector import SnowflakeConn
+from driftmon.connector.mysql_connector import MySQLConn
+from driftmon.connector.postgres_connector import PostgresConn
+from driftmon.connector.snowflake_connector import SnowflakeConn
 
 
 @pytest.fixture

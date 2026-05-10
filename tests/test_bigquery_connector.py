@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from google.api_core.exceptions import NotFound
 
-from src.connector.bigquery_connector import BigQueryConn
+from driftmon.connector.bigquery_connector import BigQueryConn
 
 
 @pytest.fixture

@@ -3,7 +3,7 @@ import json
 import os
 from typing import List, Literal, Optional
 
-from src.detect.profiler import SummaryStats
+from driftmon.detect.profiler import SummaryStats
 
 
 def save_profile(

@@ -2,7 +2,7 @@ import json
 
 import pandas as pd
 
-from src.detect.profiler import SummaryStats
+from driftmon.detect.profiler import SummaryStats
 
 
 def test_profile_numeric():

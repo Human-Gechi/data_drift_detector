@@ -5,9 +5,6 @@ description = "Data drift detector for datasets, table datawhat"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-urls = {
-    "Repository" = "https://github.com/Human-Gechi/data_drift_detector"
-}
 authors = [
     { name = "Human-Gechi", email = "okoliogechi74@gmail.com" }
 ]
@@ -22,12 +19,12 @@ dependencies = [
     "snowflake-connector-python==4.4.0",
     "google-auth==2.49.2",
     "ruff==0.15.10",
-    "db-dtypes==1.17.0",
+    "db-dtypes==1.5.1",
     "google-cloud-bigquery-storage==2.37.0",
     "streamlit==1.56.0",
     "numpy==2.4.4",
     "scipy==1.17.1",
-    "statsmodels==0.41.6",
+    "statsmodels==0.14.6",
     "slack_sdk==3.41.0",
     "prompt_toolkit== 3.0.52",
     "typer==0.25.0",
@@ -38,6 +35,8 @@ dependencies = [
 dev = [
     "ruff>=0.15.10"
 ]
+[project.urls]
+Repository = "https://github.com/Human-Gechi/data_drift_detector"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
@@ -49,7 +48,6 @@ target-version = "py311"
 
 exclude = [
     ".gitignore",
-    "README.md",
     "venv"
 ]
 
@@ -62,4 +60,4 @@ line-ending = "lf"
 select = ["E", "I"]
 
 [project.scripts]
-driftmon = "src.cli:app"
+driftmon = "driftmon.cli:main_shell"

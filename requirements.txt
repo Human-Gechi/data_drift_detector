@@ -8,10 +8,10 @@ snowflake-connector-python==4.4.0
 google-auth==2.49.2
 ruff==0.15.10
 google-cloud-bigquery-storage==2.37.0
-db-dtypes==1.17.0
+db-dtypes==1.5.1
 streamlit==1.56.0
 numpy==2.4.4
-statsmodels==0.41.6
+statsmodels==0.14.6
 slack_sdk==3.41.0
 prompt_toolkit==3.0.52
 typer==0.25.0

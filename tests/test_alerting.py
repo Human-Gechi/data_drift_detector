@@ -4,8 +4,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from slack_sdk.errors import SlackApiError
 
-from src.alerts.email_alert import Email
-from src.alerts.slack_alert import Slack
+from driftmon.alerts.email_alert import Email
+from driftmon.alerts.slack_alert import Slack
 
 
 @pytest.fixture

@@ -35,7 +35,7 @@ class Slack:
         self.tables = tables
 
     def send_notification(self):
-        from src.detect.drift_detector import detect_drift
+        from driftmon.detect.drift_detector import detect_drift
 
         client = WebClient(token=self.token)
 

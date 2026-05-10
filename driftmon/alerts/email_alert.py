@@ -56,7 +56,7 @@ class Email:
         )
 
     def send_email(self, subject=_EMAIL_SUBJECT, html_body: str = None):
-        from src.detect.drift_detector import detect_drift
+        from driftmon.detect.drift_detector import detect_drift
 
         drift_report = detect_drift(self.file_path, self.tables)
 

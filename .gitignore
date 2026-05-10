@@ -1,1 +1,9 @@
 venv
+__pycache__
+hashes.jsonl
+monitoring_history.jsonl
+.env
+meta-spirit-494622-f5-82b375b04e9e.json
+params.yaml
+.pytest_cache
+.ruff_cache

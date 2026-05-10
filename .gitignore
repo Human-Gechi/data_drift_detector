@@ -1,11 +1,9 @@
 venv
-drift.log
-data.json
-Product.csv
 __pycache__
 hashes.jsonl
 monitoring_history.jsonl
 .env
 meta-spirit-494622-f5-82b375b04e9e.json
-.mycli_conn.json
 params.yaml
+.pytest_cache
+.ruff_cache

@@ -331,7 +331,8 @@ class PostgresConn:
             batch_size (int): Number of rows per query batch.
 
         Yields:
-            tuple: (key, DataFrame) where key is "schema.table.group" and DataFrame contains grouped columns' data.
+            tuple: (key, DataFrame) where key is "schema.table.group"
+            and DataFrame contains grouped columns' data.
 
         Raises:
             DatabaseConnectionError: On query or connection errors.

@@ -1,14 +1,19 @@
 [project]
-name = "data_drift_detector"
+name = "driftmon"
 version = "0.1.0"
-description = "Data drift detector for datasets"
+description = "Data drift detector for datasets, table datawhat"
 readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "MIT" }
+urls = {
+    "Repository" = "https://github.com/Human-Gechi/data_drift_detector"
+}
 authors = [
     { name = "Human-Gechi", email = "okoliogechi74@gmail.com" }
 ]
+keywords = ["data", "drift", "monitoring"]
 dependencies = [
-    "pandas==3.0.2",
+    "pandas==2.3.3",
     "scipy==1.17.1",
     "psycopg2-binary==2.9.11",
     "pytest==9.0.3",
@@ -16,7 +21,17 @@ dependencies = [
     "mysqlclient==2.2.8",
     "snowflake-connector-python==4.4.0",
     "google-auth==2.49.2",
-    "ruff==0.15.10"
+    "ruff==0.15.10",
+    "db-dtypes==1.17.0",
+    "google-cloud-bigquery-storage==2.37.0",
+    "streamlit==1.56.0",
+    "numpy==2.4.4",
+    "scipy==1.17.1",
+    "statsmodels==0.41.6",
+    "slack_sdk==3.41.0",
+    "prompt_toolkit== 3.0.52",
+    "typer==0.25.0",
+    "plotly==6.7.0"
 ]
 
 [project.optional-dependencies]
@@ -24,6 +39,9 @@ dev = [
     "ruff>=0.15.10"
 ]
 
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [tool.ruff]
 line-length = 100
@@ -44,4 +62,4 @@ line-ending = "lf"
 select = ["E", "I"]
 
 [project.scripts]
-data_drift_detector = "src.cli:app"
+driftmon = "src.cli:app"

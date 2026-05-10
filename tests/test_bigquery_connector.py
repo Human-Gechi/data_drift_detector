@@ -2,10 +2,9 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 import pytest
-
-from src.connector.bigquery_connector import BigQueryConn
 from google.api_core.exceptions import NotFound
 
+from src.connector.bigquery_connector import BigQueryConn
 
 
 @pytest.fixture

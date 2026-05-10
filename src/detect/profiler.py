@@ -21,13 +21,14 @@ class SummaryStats:
             nulls, and value frequencies.
 
         profile_text(df)
-            Profiles text (object/string) columns, determines if each is unstructured text or categorical
-            (low or high cardinality) based on average character length and uniqueness ratio.
-            Computes statistics such as unique value count, average and standard deviation of
-            character length, uniqueness ratio, and provides top labels or sample previews.
+            Profiles text (object/string) columns, determines if each is unstructured text or
+            categorical (low or high cardinality) based on average character length
+            and uniqueness ratio. Computes statistics such as unique value count, average
+            and standard deviation of character length, uniqueness ratio,
+            and provides top labels or sample previews.
 
         profile_date(df)
-            Profiles date/datetime columns, computing count, variance, min, max , max (as epoch time)
+            Profiles date/datetime columns, computing count, variance, min, max , max(as epoch time)
             and number of nulls.
 
 

@@ -4,8 +4,6 @@ from dataclasses import dataclass
 import MySQLdb
 import pandas as pd
 
-from log import get_ingest_logger
-
 # Mapping datatypes
 MYSQL_TO_PANDAS_MAP = {
     "integer": "Int64",
@@ -117,7 +115,8 @@ class MySQLConn:
             receiver_email (str): Recipient's email address.
             sender_password (str): Sender's email password (for SMTP authentication).
             tables (List[str]): List of table names to monitor.
-            file_path (str, optional): Path to the monitoring history file (default: "monitoring_history.jsonl").
+            file_path (str, optional): Path to the monitoring history file
+            (default: "monitoring_history.jsonl").
 
         Methods:
             send_email(subject, html_body):
@@ -371,7 +370,8 @@ class MySQLConn:
             batch_size (int): Number of rows per query batch, 50000 : default
 
         Yields:
-            tuple: (key, DataFrame) where key is "schema.table.group" and DataFrame contains grouped columns' data.
+            tuple: (key, DataFrame) where key is "schema.table.group"
+            and DataFrame contains grouped columns' data.
 
         Raises:
             DatabaseConnectionError: On query or connection errors.

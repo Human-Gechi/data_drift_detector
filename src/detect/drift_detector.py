@@ -9,7 +9,8 @@ from statsmodels.stats.proportion import proportions_ztest
 
 def _get_latest_two_hashes(file_path, table_names):
     """
-    Retrieve the latest two hash entries for each table in table_names from a newline-delimited JSON file.
+    Retrieve the latest two hash entries for each table in table_names
+    from a newline-delimited JSON file.
 
     Args:
         file_path (str): Path to the hash history file.

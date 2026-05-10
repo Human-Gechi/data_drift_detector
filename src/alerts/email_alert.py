@@ -25,12 +25,14 @@ class Email:
         receiver_email (str): Recipient's email address.
         sender_password (str): Sender's email password (for SMTP authentication).
         tables (List[str]): List of table names to monitor.
-        file_path (str, optional): Path to the monitoring history file (default: "monitoring_history.jsonl").
+        file_path (str, optional): Path to the monitoring history file
+        (default: "monitoring_history.jsonl").
 
     Methods:
         send_email(subject, html_body):
             Runs drift detection and sends an email with the drift report.
     """
+
     def __init__(
         self,
         sender_email: str,

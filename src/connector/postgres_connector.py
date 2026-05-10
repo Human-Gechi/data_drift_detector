@@ -3,10 +3,6 @@ from dataclasses import dataclass
 import pandas as pd
 import psycopg2
 
-from log import get_ingest_logger
-
-data_logger = get_ingest_logger()
-
 PG_TO_PANDAS_MAP = {
     "integer": "Int64",
     "bigint": "Int64",
@@ -37,6 +33,15 @@ class PostgresConn:
     password: str
 
     def __enter__(self):
+        """
+        Establish PostgreSQL connection and return connection instance.
+
+        Returns:
+            psycopg2.connect: Authenticated PostgreSQL connection.
+
+        Raises:
+            DatabaseConnectionError: If connection fails.
+        """
         try:
             self.conn = psycopg2.connect(
                 host=self.host,
@@ -57,6 +62,11 @@ class PostgresConn:
             raise DatabaseConnectionError(f"An unexpected error occurred: {e}") from e
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Close PostgreSQL connection on context manager exit.
+
+        Ensures proper cleanup of connection resources when exiting the with block.
+        """
         if hasattr(self, "conn"):
             try:
                 self.conn.close()
@@ -64,6 +74,20 @@ class PostgresConn:
                 pass
 
     def get_table_info(self, conn, table_names=None, schema=None):
+        """
+        Retrieve column names and data types for specified tables in a schema.
+
+        Args:
+            conn: Active PostgreSQL connection.
+            table_names (list or str): Table names to retrieve info for.
+            schema (str): Schema name.
+
+        Returns:
+            dict: Mapping of (schema, table) to list of (column_name, data_type) tuples.
+
+        Raises:
+            DatabaseConnectionError: On query or connection errors.
+        """
         if table_names is None:
             raise ValueError("table_names must be provided")
         if isinstance(table_names, str):
@@ -105,6 +129,20 @@ class PostgresConn:
         return results
 
     def group_tables_by_type(self, conn, table_names=None, schema=None):
+        """
+        Group columns of tables by their PostgreSQL data type categories.
+
+        Args:
+            conn: Active PostgreSQL connection.
+            table_names (list or str): Table names to group.
+            schema (str): Schema name.
+
+        Returns:
+            dict: Mapping of (schema, table) to dict of grouped columns by type.
+
+        Raises:
+            DatabaseConnectionError: On query or connection errors.
+        """
         numerical_types = {
             "integer",
             "bigint",
@@ -141,6 +179,20 @@ class PostgresConn:
             raise DatabaseConnectionError(f"Error in group_tables_by_type: {e}") from e
 
     def table_exists(self, conn, schema, table):
+        """
+        Check if a table exists in the given schema.
+
+        Args:
+            conn: Active PostgreSQL connection.
+            schema (str): Schema name.
+            table (str): Table name.
+
+        Returns:
+            bool: True if table exists, False otherwise.
+
+        Raises:
+            DatabaseConnectionError: On query or connection errors.
+        """
         try:
             cursor = conn.cursor()
             cursor.execute(
@@ -164,6 +216,19 @@ class PostgresConn:
             raise DatabaseConnectionError(f"Unexpected error in table_exists: {e}") from e
 
     def get_tables_in_schema(self, conn, schema):
+        """
+        Retrieve all table names in a given schema.
+
+        Args:
+            conn: Active PostgreSQL connection.
+            schema (str): Schema name.
+
+        Returns:
+            list: List of table names.
+
+        Raises:
+            DatabaseConnectionError: On query or connection errors.
+        """
         tables = []
         try:
             cursor = conn.cursor()
@@ -194,7 +259,22 @@ class PostgresConn:
             raise DatabaseConnectionError(f"Error in get_tables_in_schema:{e}") from e
         return tables
 
-    def get_table_hashes(self, conn, table_names=None, schema=None, batch_size=5000):
+    def get_table_hashes(self, conn, table_names=None, schema=None, batch_size=50000):
+        """
+        Calculate hash values for specified tables using PostgreSQL's hashtext function.
+
+        Args:
+            conn: Active PostgreSQL connection.
+            table_names (list or str): Table names to hash.
+            schema (str): Schema name.
+            batch_size (int): Number of rows per query batch.
+
+        Returns:
+            dict: Mapping of (schema, table) to hash value or None if table does not exist.
+
+        Raises:
+            DatabaseConnectionError: On query or connection errors.
+        """
         if table_names is None:
             raise ValueError("table_names must be provided")
         if schema is None:
@@ -241,6 +321,21 @@ class PostgresConn:
         return results
 
     def get_group_data(self, conn, schema=None, table_names=None, batch_size=50000):
+        """
+        Retrieve column data in batches grouped by type for profiling.
+
+        Args:
+            conn: Active PostgreSQL connection.
+            schema (str): Schema name.
+            table_names (list or str): Table names to process.
+            batch_size (int): Number of rows per query batch.
+
+        Yields:
+            tuple: (key, DataFrame) where key is "schema.table.group" and DataFrame contains grouped columns' data.
+
+        Raises:
+            DatabaseConnectionError: On query or connection errors.
+        """
         if schema is None:
             schema = "public"
         if table_names and isinstance(table_names, str):

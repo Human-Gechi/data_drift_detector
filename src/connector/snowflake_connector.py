@@ -43,6 +43,15 @@ class SnowflakeConn:
     role: Optional[str] = None
 
     def __enter__(self):
+        """
+        Establish Snowflake connection and return connection instance.
+
+        Returns:
+            snowflake.connector.connect: Authenticated Snowflake connection.
+
+        Raises:
+            DatabaseConnectionError: If connection fails.
+        """
         try:
             conn_params = {
                 "user": self.user,
@@ -61,6 +70,11 @@ class SnowflakeConn:
             raise DatabaseConnectionError(f"Snowflake connection failed: {e}") from e
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Close Snowflake connection on context manager exit.
+
+        Ensures proper cleanup of connection resources when exiting the with block.
+        """
         if hasattr(self, "conn"):
             try:
                 self.conn.close()
@@ -68,6 +82,20 @@ class SnowflakeConn:
                 pass
 
     def get_table_info(self, conn, table_names=None, schemas=None):
+        """
+        Retrieve column names and data types for specified tables in schemas.
+
+        Args:
+            conn: Active Snowflake connection.
+            table_names (list or str): Table names to retrieve info for.
+            schemas (list or str): Schema names.
+
+        Returns:
+            dict: Mapping of (schema, table) to list of (column_name, data_type) tuples.
+
+        Raises:
+            DatabaseConnectionError: On query or connection errors.
+        """
         if table_names is None:
             raise ValueError("table_names must be provided")
         if isinstance(table_names, str):
@@ -104,6 +132,20 @@ class SnowflakeConn:
         return results
 
     def group_tables_by_type(self, conn, table_names=None, schemas=None):
+        """
+        Group columns of tables by their Snowflake data type categories.
+
+        Args:
+            conn: Active Snowflake connection.
+            table_names (list or str): Table names to group.
+            schemas (list or str): Schema names.
+
+        Returns:
+            dict: Mapping of (schema, table) to dict of grouped columns by type.
+
+        Raises:
+            DatabaseConnectionError: On query or connection errors.
+        """
         numerical_types = {
             "integer",
             "bigint",
@@ -140,6 +182,20 @@ class SnowflakeConn:
             raise DatabaseConnectionError(f"Error in group_tables_by_type: {e}") from e
 
     def table_exists(self, conn, schema, table):
+        """
+        Check if a table exists in the given schema.
+
+        Args:
+            conn: Active Snowflake connection.
+            schema (str): Schema name.
+            table (str): Table name.
+
+        Returns:
+            bool: True if table exists, False otherwise.
+
+        Raises:
+            DatabaseConnectionError: On query or connection errors.
+        """
         try:
             print(f"Checking {schema}, table {table}")
             cursor = conn.cursor()
@@ -155,6 +211,19 @@ class SnowflakeConn:
             raise DatabaseConnectionError(f"Error in table_exists: {e}") from e
 
     def get_tables_in_schemas(self, conn, schemas):
+        """
+        Retrieve all table names in given schemas.
+
+        Args:
+            conn: Active Snowflake connection.
+            schemas (list or str): Schema names.
+
+        Returns:
+            list: List of (schema, table) tuples.
+
+        Raises:
+            DatabaseConnectionError: On query or connection errors.
+        """
         if isinstance(schemas, str):
             schemas = [schemas]
         tables = []
@@ -181,6 +250,20 @@ class SnowflakeConn:
         return tables
 
     def get_table_hashes(self, conn, table_names=None, schemas=None) -> int:
+        """
+        Calculate hash values for specified tables using Snowflake's HASH_AGG.
+
+        Args:
+            conn: Active Snowflake connection.
+            table_names (list or str): Table names to hash.
+            schemas (list or str): Schema names.
+
+        Returns:
+            dict: Mapping of (schema, table) to hash value or None if table does not exist.
+
+        Raises:
+            DatabaseConnectionError: On query or connection errors.
+        """
         if table_names is None:
             raise ValueError("table_names must be provided")
         if schemas is None:
@@ -213,6 +296,21 @@ class SnowflakeConn:
         return results
 
     def get_group_data(self, conn, schemas=None, table_names=None, batch_size=50000):
+        """
+        Retrieve column data in batches grouped by type for profiling.
+
+        Args:
+            conn: Active Snowflake connection.
+            schemas (list or str): Schema names.
+            table_names (list or str): Table names to process.
+            batch_size (int): Number of rows per query batch.
+
+        Yields:
+            tuple: (key, DataFrame) where key is "schema.table.group" and DataFrame contains grouped columns' data.
+
+        Raises:
+            DatabaseConnectionError: On query or connection errors.
+        """
         if schemas is None:
             schemas = ["snowflake"]
         if isinstance(schemas, str):

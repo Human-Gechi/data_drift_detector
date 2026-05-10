@@ -6,7 +6,7 @@ from typing import List, Literal, Optional
 from src.detect.profiler import SummaryStats
 
 
-def append_profiles_hash(
+def save_profile(
     conn_type: Literal["postgres", "snowflake", "mysql", "bigquery"],
     connector,
     conn,
@@ -16,6 +16,26 @@ def append_profiles_hash(
     schemas: Optional[List[str]] = None,
     datasets: Optional[List[str]] = None,
 ):
+    """
+    Profiles tables from a database connection and saves the results to a monitoring history file.
+
+    For each table, computes a hash and summary statistics for each column group (numerical, text, date, boolean).
+    Supports BigQuery, Snowflake, Postgres, and MySQL. Appends results as JSON lines to 
+    the specified output file.
+
+    Args:
+        conn_type (Literal): Type of database connection ("postgres", "snowflake", "mysql", "bigquery").
+        connector: Database connector object with required methods.
+        conn: Active database connection/client.
+        output_file (str): Path to the output monitoring history file (default: "monitoring_history.jsonl").
+        table_names (Optional[List[str]]): List of table names to profile.
+        schema (Optional[str]): Schema name (for Postgres/MySQL).
+        schemas (Optional[List[str]]): List of schemas (for Snowflake).
+        datasets (Optional[List[str]]): List of datasets (for BigQuery).
+
+    Returns:
+        str: Status message indicating success or failure.
+    """
     reports = []
 
     if table_names:

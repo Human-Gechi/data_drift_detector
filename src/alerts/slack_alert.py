@@ -10,6 +10,22 @@ _BASE = 1
 
 
 class Slack:
+    """
+    Slack alert handler for sending data drift notifications.
+
+    Sends a formatted Slack message to a specified channel when data drift is detected
+    in monitored tables. Uses the Slack WebClient and supports retry logic on failure.
+
+    Args:
+        token (str): Slack API token.
+        channel (str): Slack channel ID or name.
+        tables (List[str], optional): List of table names to monitor.
+        file_path (str, optional): Path to the monitoring history file (default: "monitoring_history.jsonl").
+
+    Methods:
+        send_notification():
+            Runs drift detection and sends a notification message to Slack.
+    """
     def __init__(self, token: str, channel: str, tables: List[str] = None, file_path: str = None):
         self.token = token
         self.channel = channel

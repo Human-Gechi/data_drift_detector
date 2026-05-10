@@ -8,6 +8,16 @@ from statsmodels.stats.proportion import proportions_ztest
 
 
 def _get_latest_two_hashes(file_path, table_names):
+    """
+    Retrieve the latest two hash entries for each table in table_names from a newline-delimited JSON file.
+
+    Args:
+        file_path (str): Path to the hash history file.
+        table_names (List[str]): List of table names to search for.
+
+    Returns:
+        dict: Mapping of table name to a tuple (latest_hash, previous_hash).
+    """
     results = defaultdict(list)
     target_set = set(table_names)
 
@@ -47,7 +57,17 @@ def _get_latest_two_hashes(file_path, table_names):
 
 
 def _detect_drift_in_history(file_path: str, alpha: float = 0.05, base_psi: float = 0.20):
+    """
+    Detects data drift in the monitoring history file for all tables.
 
+    Args:
+        file_path (str): Path to the monitoring history file.
+        alpha (float): Significance level for statistical tests (default 0.05).
+        base_psi (float): Threshold for Population Stability Index (default 0.20).
+
+    Returns:
+        dict: Drift report for each table, including column-level drift details.
+    """
     table_entries = defaultdict(list)
 
     with open(file_path, "r") as f:
@@ -208,6 +228,16 @@ def _detect_drift_in_history(file_path: str, alpha: float = 0.05, base_psi: floa
 
 
 def _resolve_table_names(file_path, user_tables):
+    """
+    Resolves user-provided table names to their full names as found in the monitoring history file.
+
+    Args:
+        file_path (str): Path to the monitoring history file.
+        user_tables (Union[str, List[str]]): Table names to resolve.
+
+    Returns:
+        list: List of resolved full table names.
+    """
     if isinstance(user_tables, str):
         user_tables = [user_tables]
 
@@ -232,6 +262,18 @@ def _resolve_table_names(file_path, user_tables):
 
 
 def detect_drift(file_path, table_names, alpha=0.05, base_psi: float = 0.20):
+    """
+    Runs data drift detection for the specified tables using the monitoring history file.
+
+    Args:
+        file_path (str): Path to the monitoring history file.
+        table_names (Union[str, List[str]]): Table names to check for drift.
+        alpha (float): Significance level for statistical tests (default 0.05).
+        base_psi (float): Threshold for Population Stability Index (default 0.20).
+
+    Returns:
+        str: Human-readable drift detection summary.
+    """
     resolved_table_names = _resolve_table_names(file_path, table_names)
     if not resolved_table_names:
         return "No matching tables found in monitoring history."

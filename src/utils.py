@@ -2,7 +2,7 @@ import time
 
 
 class TimedConnection:
-    "Mimicks Connection timeing to differen connectors"
+    "Mimicks Connection timing to different connectors"
 
     def __init__(self, conn, timeout=600):
         self.conn = conn

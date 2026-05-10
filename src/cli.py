@@ -171,7 +171,7 @@ def configure():
 @app.command()
 def monitoring():
     """Append Baseline stats profiling to jsonl file"""
-    from src.detect.monitoring import append_profiles_hash
+    from src.detect.monitoring import save_profile
 
     params = load_conn_params()
     if not params:
@@ -210,7 +210,7 @@ def monitoring():
     ) as progress:
         monitor_task = progress.add_task(description="Running monitoring...", total=None)
 
-        result = append_profiles_hash(
+        result = save_profile(
             conn_type=params["type"],
             connector=connector,
             conn=conn_obj,

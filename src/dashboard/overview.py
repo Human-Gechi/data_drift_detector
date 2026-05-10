@@ -176,6 +176,7 @@ def plot_check_tables(records):
 
 
 def main():
+    "Main function for running all functions in the overview.py file"
     from src.dashboard.tables_dashboard import get_available_tables, read_file
 
     records = read_file()

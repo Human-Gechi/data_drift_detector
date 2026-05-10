@@ -44,12 +44,22 @@ def test_profile_text():
         {
             "col1": ["apple", "banana", "apple", "orange", "banana", "apple"],
             "col2": [
-                "This is a long unstructured text with very long words and extra padding to exceed thirty characters.",
-                "Another unique sentence with more words and different content, making sure it's long enough for the test.",
-                "Yet another completely different sentence for testing, with enough length to pass the threshold.",
-                "Unstructured data is often verbose and unique, especially when the sentences are long enough.",
-                "Text analytics is fun with lots of unique sentences, especially when they are long and detailed.",
-                "Machine learning loves unstructured text columns, particularly when the text is sufficiently lengthy.",
+                "This is a long unstructured text with very long words and extra padding to exceed "
+                "thirty characters. It should be at least one hundred characters long "
+                "for the test to pass. Here is some extra text.",
+                "Another unique sentence with more words and different content, making sure it's "
+                "long enough for the test. This line is also extended to ensure "
+                "it exceeds one hundred characters in length.",
+                "Yet another completely different sentence for testing, with enough length to "
+                "pass the threshold. Adding more words to ensure the string is long enough "
+                "for the test case.",
+                "Unstructured data is often verbose and unique, especially when the sentences "
+                "are long enough. This line is padded to exceed one hundred characters.",
+                "Text analytics is fun with lots of unique sentences, especially when they are long"
+                "and detailed. This is extra padding to reach the required length.",
+                "Machine learning loves unstructured text columns, particularly when the text is "
+                "sufficiently lengthy. More words are added here to ensure the string is over "
+                "one hundred characters.",
             ],
         }
     )

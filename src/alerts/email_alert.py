@@ -14,6 +14,23 @@ _BASE = 1
 
 
 class Email:
+    """
+    Email alert handler for sending data drift notifications.
+
+    Sends an HTML-formatted email to a specified recipient when data drift is detected
+    in monitored tables. Uses Jinja2 templates for formatting and supports retry logic.
+
+    Args:
+        sender_email (str): Sender's email address.
+        receiver_email (str): Recipient's email address.
+        sender_password (str): Sender's email password (for SMTP authentication).
+        tables (List[str]): List of table names to monitor.
+        file_path (str, optional): Path to the monitoring history file (default: "monitoring_history.jsonl").
+
+    Methods:
+        send_email(subject, html_body):
+            Runs drift detection and sends an email with the drift report.
+    """
     def __init__(
         self,
         sender_email: str,

@@ -34,10 +34,10 @@ def snowflake_conn():
     )
 
 
-@patch("src.connector.snowflake_connector.snowflake.connector.connect")
-@patch("src.connector.postgres_connector.psycopg2.connect")
-@patch("src.connector.mysql_connector.MySQLdb.connect")
-def test__enter_and__exit(
+@patch("driftmon.connector.snowflake_connector.snowflake.connector.connect")
+@patch("driftmon.connector.postgres_connector.psycopg2.connect")
+@patch("driftmon.connector.mysql_connector.MySQLdb.connect")
+def test_connect_and_context_manager(
     mock_mysql_connect,
     mock_postgres_connect,
     mock_snowflake_connect,
@@ -54,25 +54,34 @@ def test__enter_and__exit(
     mock_snow_conn = MagicMock()
     mock_snowflake_connect.return_value = mock_snow_conn
 
-    with postgres_conn as conn:
-        assert conn == mock_pg_conn
-        assert hasattr(postgres_conn, "conn")
+    assert postgres_conn.connect() == mock_pg_conn
+    assert postgres_conn.conn == mock_pg_conn
+
+    assert mysql_conn.connect() == mock_mysql_conn
+    assert mysql_conn.conn == mock_mysql_conn
+
+    assert snowflake_conn.connect() == mock_snow_conn
+    assert snowflake_conn.conn == mock_snow_conn
+
+    with postgres_conn as _:
+        assert postgres_conn.conn == mock_pg_conn
     mock_pg_conn.close.assert_called_once()
+    assert postgres_conn.conn is None
 
-    with mysql_conn as conn:
-        assert conn == mock_mysql_conn
-        assert hasattr(mysql_conn, "conn")
+    with mysql_conn as _:
+        assert mysql_conn.conn == mock_mysql_conn
     mock_mysql_conn.close.assert_called_once()
+    assert mysql_conn.conn is None
 
-    with snowflake_conn as conn:
-        assert conn == mock_snow_conn
-        assert hasattr(snowflake_conn, "conn")
+    with snowflake_conn as _:
+        assert snowflake_conn.conn == mock_snow_conn
     mock_snow_conn.close.assert_called_once()
+    assert snowflake_conn.conn is None
 
 
-@patch("src.connector.snowflake_connector.snowflake.connector.connect")
-@patch("src.connector.postgres_connector.psycopg2.connect")
-@patch("src.connector.mysql_connector.MySQLdb.connect")
+@patch("driftmon.connector.snowflake_connector.snowflake.connector.connect")
+@patch("driftmon.connector.postgres_connector.psycopg2.connect")
+@patch("driftmon.connector.mysql_connector.MySQLdb.connect")
 def test_get_table_info(
     mock_mysql_connect,
     mock_postgres_connect,
@@ -97,9 +106,9 @@ def test_get_table_info(
             ("col_bool", "boolean"),
         ]
 
-        with conn as db_conn:
+        with conn as _:
             if conn is snowflake_conn:
-                result = conn.get_table_info(db_conn, table_names="my_table", schemas="my_schema")
+                result = conn._get_table_info(table_names="my_table", schemas="my_schema")
                 expected = {
                     ("my_schema", "my_table"): [
                         ("col_numeric", "integer"),
@@ -108,7 +117,7 @@ def test_get_table_info(
                     ]
                 }
             else:
-                result = conn.get_table_info(db_conn, table_names="my_table", schema="my_schema")
+                result = conn._get_table_info(table_names="my_table", schema="my_schema")
                 expected = {
                     ("my_schema", "my_table"): [
                         ("col_numeric", "integer"),
@@ -121,9 +130,9 @@ def test_get_table_info(
             mock_cursor.close.assert_called_once()
 
 
-@patch("src.connector.snowflake_connector.snowflake.connector.connect")
-@patch("src.connector.postgres_connector.psycopg2.connect")
-@patch("src.connector.mysql_connector.MySQLdb.connect")
+@patch("driftmon.connector.snowflake_connector.snowflake.connector.connect")
+@patch("driftmon.connector.postgres_connector.psycopg2.connect")
+@patch("driftmon.connector.mysql_connector.MySQLdb.connect")
 def test_group_tables_by_type(
     mock_mysql_connect,
     mock_postgres_connect,
@@ -140,7 +149,7 @@ def test_group_tables_by_type(
         mock_db_conn = MagicMock()
         mock_connect.return_value = mock_db_conn
 
-        conn.get_table_info = MagicMock(
+        conn._get_table_info = MagicMock(
             return_value={
                 ("my_schema", "my_table"): [
                     ("col_numeric", "integer"),
@@ -159,17 +168,17 @@ def test_group_tables_by_type(
         }
         schema = "my_schema"
         table_names = "my_table"
-        with conn as db_conn:
+        with conn as _:
             if conn is snowflake_conn:
-                result = conn.group_tables_by_type(db_conn, table_names, schemas=schema)
+                result = conn._group_tables_by_type(table_names, schemas=schema)
             else:
-                result = conn.group_tables_by_type(db_conn, table_names, schema)
+                result = conn._group_tables_by_type(table_names, schema)
             assert result == groups
 
 
-@patch("src.connector.snowflake_connector.snowflake.connector.connect")
-@patch("src.connector.postgres_connector.psycopg2.connect")
-@patch("src.connector.mysql_connector.MySQLdb.connect")
+@patch("driftmon.connector.snowflake_connector.snowflake.connector.connect")
+@patch("driftmon.connector.postgres_connector.psycopg2.connect")
+@patch("driftmon.connector.mysql_connector.MySQLdb.connect")
 def test_table_exists(
     mock_mysql_connect,
     mock_postgres_connect,
@@ -190,19 +199,16 @@ def test_table_exists(
 
         mock_cursor.fetchone.return_value = (1,)
 
-        with conn as db_conn:
-            if conn is snowflake_conn:
-                result = conn.table_exists(db_conn, schema="my_schema", table="my_table")
-            else:
-                result = conn.table_exists(db_conn, schema="my_schema", table="my_table")
+        with conn as _:
+            result = conn._table_exists(schema="my_schema", table="my_table")
             assert result is True
             mock_cursor.execute.assert_called_once()
             mock_cursor.close.assert_called_once()
 
 
-@patch("src.connector.snowflake_connector.snowflake.connector.connect")
-@patch("src.connector.postgres_connector.psycopg2.connect")
-@patch("src.connector.mysql_connector.MySQLdb.connect")
+@patch("driftmon.connector.snowflake_connector.snowflake.connector.connect")
+@patch("driftmon.connector.postgres_connector.psycopg2.connect")
+@patch("driftmon.connector.mysql_connector.MySQLdb.connect")
 def test_get_table_in_schema(
     mock_mysql_connect,
     mock_postgres_connect,
@@ -223,25 +229,25 @@ def test_get_table_in_schema(
 
         mock_cursor.fetchall.return_value = [("my_table1",), ("my_table2",)]
 
-        with conn as db_conn:
+        with conn as _:
             if conn is snowflake_conn:
-                result = [t[1] for t in conn.get_tables_in_schemas(db_conn, schemas="my_schema")]
+                result = [t[1] for t in conn._get_tables_in_schemas(schemas="my_schema")]
                 assert result == ["my_table1", "my_table2"]
             else:
-                result = conn.get_tables_in_schema(db_conn, schema="my_schema")
+                result = conn._get_tables_in_schema(schema="my_schema")
                 assert result == ["my_table1", "my_table2"]
             mock_cursor.execute.assert_called_once()
             mock_cursor.close.assert_called_once()
 
 
-@patch("src.connector.snowflake_connector.snowflake.connector.connect")
+@patch("driftmon.connector.snowflake_connector.snowflake.connector.connect")
 def test_get_table_hashes_snowflake(mock_connect, snowflake_conn):
     mock_conn = MagicMock()
     mock_cursor = MagicMock()
     mock_connect.return_value = mock_conn
     mock_conn.cursor.return_value = mock_cursor
 
-    snowflake_conn.table_exists = MagicMock(return_value=True)
+    snowflake_conn._table_exists = MagicMock(return_value=True)
     mock_cursor.fetchone.side_effect = [
         (1234567891011121389,),
         (1234567891011121314,),
@@ -250,8 +256,8 @@ def test_get_table_hashes_snowflake(mock_connect, snowflake_conn):
     schema = "my_schema"
     table_names = ["my_table1", "my_table2"]
 
-    with snowflake_conn as conn:
-        results = snowflake_conn.get_table_hashes(conn, table_names, schemas=schema)
+    with snowflake_conn as _:
+        results = snowflake_conn._get_table_hashes(table_names, schemas=schema)
         assert results == {
             ("my_schema", "my_table1"): 1234567891011121389,
             ("my_schema", "my_table2"): 1234567891011121314,
@@ -259,14 +265,14 @@ def test_get_table_hashes_snowflake(mock_connect, snowflake_conn):
         assert mock_cursor.close.call_count == 1
 
 
-@patch("src.connector.postgres_connector.psycopg2.connect")
+@patch("driftmon.connector.postgres_connector.psycopg2.connect")
 def test_get_table_hashes_postgres(mock_connect, postgres_conn):
     mock_conn = MagicMock()
     mock_cursor = MagicMock()
     mock_connect.return_value = mock_conn
     mock_conn.cursor.return_value = mock_cursor
 
-    postgres_conn.table_exists = MagicMock(return_value=True)
+    postgres_conn._table_exists = MagicMock(return_value=True)
     mock_cursor.fetchone.side_effect = [
         (1234567891011121389,),
         (None,),
@@ -278,8 +284,8 @@ def test_get_table_hashes_postgres(mock_connect, postgres_conn):
     schema = "my_schema"
     table_names = ["my_table1", "my_table2"]
 
-    with postgres_conn as conn:
-        results = postgres_conn.get_table_hashes(conn, table_names, schema, batch_size)
+    with postgres_conn as _:
+        results = postgres_conn._get_table_hashes(table_names, schema, batch_size)
         assert results == {
             ("my_schema", "my_table1"): 1234567891011121389,
             ("my_schema", "my_table2"): 1234567891011121314,
@@ -287,28 +293,28 @@ def test_get_table_hashes_postgres(mock_connect, postgres_conn):
         assert mock_cursor.close.call_count == 1
 
 
-@patch("src.connector.mysql_connector.MySQLdb.connect")
+@patch("driftmon.connector.mysql_connector.MySQLdb.connect")
 def test_get_table_hashes_mysql(mock_connect, mysql_conn):
     mock_conn = MagicMock()
     mock_cursor = MagicMock()
     mock_connect.return_value = mock_conn
     mock_conn.cursor.return_value = mock_cursor
 
-    mysql_conn.table_exists = MagicMock(return_value=True)
+    mysql_conn._table_exists = MagicMock(return_value=True)
     mock_cursor.fetchone.return_value = ("my_schema.my_table", 1234567891011121389)
 
     schema = "my_schema"
     table_names = "my_table1"
 
-    with mysql_conn as conn:
-        results = mysql_conn.get_table_hashes(conn, table_names, schema)
+    with mysql_conn as _:
+        results = mysql_conn._get_table_hashes(table_names, schema)
         assert results == {("my_schema", "my_table1"): 1234567891011121389}
         assert mock_cursor.close.call_count == 1
 
 
-@patch("src.connector.snowflake_connector.snowflake.connector.connect")
-@patch("src.connector.postgres_connector.psycopg2.connect")
-@patch("src.connector.mysql_connector.MySQLdb.connect")
+@patch("driftmon.connector.snowflake_connector.snowflake.connector.connect")
+@patch("driftmon.connector.postgres_connector.psycopg2.connect")
+@patch("driftmon.connector.mysql_connector.MySQLdb.connect")
 def test_get_group_data(
     mock_mysql_connect,
     mock_postgres_connect,
@@ -318,8 +324,8 @@ def test_get_group_data(
     snowflake_conn,
 ):
     for conn in [postgres_conn, mysql_conn, snowflake_conn]:
-        conn.table_exists = MagicMock(return_value=True)
-        conn.get_table_info = MagicMock(
+        conn._table_exists = MagicMock(return_value=True)
+        conn._get_table_info = MagicMock(
             return_value={
                 ("my_schema", "my_table1"): [
                     ("col_numeric", "integer"),
@@ -333,8 +339,8 @@ def test_get_group_data(
                 ],
             }
         )
-        conn.get_tables_in_schema = MagicMock(return_value=["my_table1", "my_table2"])
-        conn.group_tables_by_type = MagicMock(
+        conn._get_tables_in_schema = MagicMock(return_value=["my_table1", "my_table2"])
+        conn._group_tables_by_type = MagicMock(
             return_value={
                 ("my_schema", "my_table1"): {
                     "numerical": ["col_numeric"],
@@ -355,7 +361,7 @@ def test_get_group_data(
             {"col_numeric": [1, 2], "col_text": ["Alex", "Ogechi"], "col_boolean": [True, False]}
         )
 
-        conn.get_group_data = MagicMock(
+        conn._get_group_data = MagicMock(
             return_value=iter(
                 [
                     ("my_schema.my_table1.numerical", df[["col_numeric"]]),
@@ -368,11 +374,9 @@ def test_get_group_data(
             )
         )
 
-        with conn as db_conn:
+        with conn as _:
             results = list(
-                conn.get_group_data(
-                    db_conn, schemas="my_schema", table_names=["my_table1", "my_table2"]
-                )
+                conn._get_group_data(schemas="my_schema", table_names=["my_table1", "my_table2"])
             )
             assert results[0][0] == "my_schema.my_table1.numerical"
             assert results[0][1].equals(df[["col_numeric"]])

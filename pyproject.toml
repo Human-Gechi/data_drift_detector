@@ -61,3 +61,4 @@ select = ["E", "I"]
 
 [project.scripts]
 driftmon = "driftmon.cli:main_shell"
+driftmon-dashboard="driftmon.dashboard.launch_dashboard:_main"

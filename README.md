@@ -1,16 +1,205 @@
-# Data Drift Detector for Production Datasets
+# Driftmon: Data Drift Detection & Monitoring Tool
 
-**Description:**
-A tool to monitor production datasets (CSV, Parquet, or database tables) and automatically detect data drift—unexpected changes in data distributions, value ranges, or categorical values. The tool alerts users when new data deviates from historical baselines, helping maintain model reliability and data quality.
+**Driftmon** is a robust tool for monitoring, detecting, and alerting on data drift in production datasets and database/data warehouse tables. It helps ensure data quality and model reliability by automatically profiling data, detecting unexpected changes, and notifying stakeholders via email and Slack. Driftmon also provides a dashboard for visualizing drift trends and data changes over time.
 
-**Key Features:**
-- Profiles and stores baseline statistics for each column
-- Periodically monitors and compares new data to baselines
-- Detects drift using statistical tests (KS test, chi-square, etc.)
-- Generates alerts and summary reports when drift is detected
-- Visualizes data distributions and drift trends over time
-- Supports CSV, Parquet, and database tables
-- Configurable thresholds for drift sensitivity
+---
 
-**Why use it?**
-Ensure data consistency, catch issues early, and maintain trust in analytics and machine learning systems.
+## 🚀 Features
+
+- **Baseline Profiling:** Profiles and stores baseline statistics for each column in your tables.
+- **Automated Monitoring:** Periodically monitors new data and compares it to historical baselines.
+- **Drift Detection:** Detects drift by comparing hashes and statistical summaries of new data against previously recorded baselines.
+- **Multi-Database Support:** Works with BigQuery, Snowflake, MySQL, and PostgreSQL across multiple schemas and datasets.
+- **Alerting:** Sends real-time alerts via **Email** and **Slack** when drift is detected.
+- **Dashboard:** Interactive dashboard (Streamlit) to visualize data distributions, drift events, and trends.
+- **Configurable:** Easily configure data sources, alerting methods, and monitoring targets via CLI.
+- **CLI Interface:** Simple command-line interface for setup, monitoring, drift detection, and dashboard launch.
+
+---
+
+## 📦 Installation
+
+```bash
+pip install driftmon
+```
+OR
+```bash
+git clone https://github.com/Human-Gechi/data_drift_detector.git
+cd data_drift_detector
+pip install -e .
+```
+
+### 🛠️ CLI Commands
+| Command        | Description                                               |
+|----------------|-----------------------------------------------------------|
+| configure      | Set up data source connection and alerting configuration  |
+| monitoring     | Profile baseline statistics and monitor for changes       |
+| detect-drift   | Detect drift and send alerts via email/Slack              |
+| dashboard      | Launch the Streamlit dashboard for visualization          |
+| help           | Show CLI help                                             |
+|exit/quit       | exit CLI                                                  |
+
+### ⚡️ Quick Start for CLI
+1. Configure Your Connection & Alerts
+Set up your database/data warehouse connection and alerting preferences:
+```bash
+driftmon configure
+```
+You will be prompted for:
+
+- Connection type (bigquery, snowflake, mysql, postgres)
+- Database credentials and details
+- Tables/schemas/datasets to monitor
+- Alerting method (email, slack, or both)
+- Email/Slack credentials
+
+2. Baseline Profiling & Monitoring
+Profile your data and store baseline statistics:
+```bash
+driftmon monitoring
+```
+This command computes and saves baseline statistics and hashes for your monitored tables.
+
+3. Detect Drift & Send Alerts
+Detect data drift by comparing new data to the baseline. Alerts are sent via your configured channels:
+
+```bash
+driftmon detect-drift
+```
+If drift is detected, notifications are sent to your email and/ slack channel.
+
+4. Launch the Dashboard
+Visualize drift events, data distributions, and trends:
+```bash
+driftmon dashboard
+```
+This launches a Streamlit dashboard in your browser.
+
+🔔 Alerting
+- Email Alerts: Configure SMTP server, sender, and recipient. Driftmon sends detailed drift reports to your inbox.
+- Slack Alerts: Set up a Slack bot token and channel. Driftmon posts drift notifications directly to your Slack workspace.
+
+🗄️ Supported Data Sources
+- Google BigQuery (multiple datasets)
+- Snowflake (multiple schemas)
+- MySQL
+- PostgreSQL
+You can monitor multiple tables across different schemas/datasets.
+---
+# Example arguments for initializing connectors
+
+```python
+# PostgreSQL Connector
+from driftmon.connector.postgres_connector import PostgresConn
+
+pg_conn = PostgresConn(
+    host="your_host",
+    port=5432,
+    user="your_username",
+    password="your_password",
+    database="your_database"
+)
+
+# MySQL Connector
+from driftmon.connector.mysql_connector import MySQLConn
+
+mysql_conn = MySQLConn(
+    host="your_host",
+    port=3306,
+    user="your_username",
+    password="your_password",
+    database="your_database"
+)
+
+# Snowflake Connector
+from driftmon.connector.snowflake_connector import SnowflakeConn
+
+sf_conn = SnowflakeConn(
+    user="your_username",
+    password="your_password",
+    account="your_account",
+    warehouse="your_warehouse",
+    database="your_database",
+    schema="your_schema"
+)
+```
+---
+## 🧪 Code Samples : Using Driftmon with Context Managers
+
+This example demonstrates best practices using context managers and modular functions for connecting, profiling, drift detection, and sending alerts.
+
+```python
+from driftmon.connector.bigquery_connector import BigQueryConn
+from driftmon.detect.monitoring import save_profile
+from driftmon.detect.drift_detector import detect_drift
+from driftmon.alerts.email_alert import Email
+
+def export_data(conn, dataset, tables):
+    result = conn.get_group_data(datasets=dataset, table_names=tables)
+    for key, df in result:
+        df.to_csv(f"{key}.csv", index=False)
+
+def profile_and_detect(conn, dataset, tables):
+    save_profile(conn_type="bigquery", connector=conn, datasets=dataset, table_names=tables)
+    return detect_drift(table_names=tables)
+
+def send_drift_email(drift_report, sender, password, receiver):
+    email = Email(
+        sender=sender,
+        password=password,
+        receiver=receiver,
+        drift_report=drift_report
+    )
+    email.send_email()
+
+tables = "test_table2"
+dataset = "1306_data"
+
+with BigQueryConn(
+    project="meta-spirit-494622-f5",
+    credentials_path="meta-spirit-494622-f5-82b375b04e9e.json"
+) as conn:
+    export_data(conn, dataset, tables)
+    drift_report = profile_and_detect(conn, dataset, tables)
+    send_drift_email(
+        drift_report,
+        sender="sender@gmail.com",
+        password="your-password",
+        receiver="receiver@gmail.com"
+    )
+```
+---
+## 🧪 Example: Using Driftmon Without Context Managers (Using `.connect()` Method)
+
+This example shows how to use Driftmon by explicitly calling the `.connect()` method, without context managers for the biquery connector
+
+```python
+from driftmon.connector.bigquery_connector import BigQueryConn
+from driftmon.detect.monitoring import save_profile
+from driftmon.detect.drift_detector import detect_drift
+from driftmon.alerts.email_alert import Email
+
+tables = "test_table2"
+dataset = "1306_data"
+conn = BigQueryConn(
+    project="meta-spirit-494622-f5",
+    credentials_path="meta-spirit-494622-f5-82b375b04e9e.json"
+)
+conn.connect()
+try:
+    result = conn.get_group_data(datasets=dataset, table_names=tables)
+    for key, df in result:
+        df.to_csv(f"{key}.csv", index=False)
+except Exception as e:
+    print("Error:", e)
+
+save_profile(conn_type="bigquery", connector=conn, datasets=dataset, table_names=tables)
+drift_report = detect_drift(table_names=tables)
+email = Email(
+    sender="sender@gmail.com",
+    password="your-password",
+    receiver="receiver@gmail.com",
+    drift_report=drift_report
+)
+email.send_email()
+```

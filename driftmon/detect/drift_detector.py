@@ -262,7 +262,12 @@ def _resolve_table_names(file_path, user_tables):
     return list(resolved)
 
 
-def detect_drift(file_path, table_names, alpha=0.05, base_psi: float = 0.20):
+def detect_drift(
+    table_names: str,
+    alpha=0.05,
+    base_psi: float = 0.20,
+    file_path: str = "monitoring_history.jsonl",
+):
     """
     Runs data drift detection for the specified tables using the monitoring history file.
 

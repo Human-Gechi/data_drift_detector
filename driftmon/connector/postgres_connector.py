@@ -32,7 +32,7 @@ class PostgresConn:
     database: str
     password: str
 
-    def __enter__(self):
+    def connect(self):
         """
         Establish PostgreSQL connection and return connection instance.
 
@@ -61,19 +61,41 @@ class PostgresConn:
         except Exception as e:
             raise DatabaseConnectionError(f"An unexpected error occurred: {e}") from e
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def close(self):
         """
-        Close PostgreSQL connection on context manager exit.
+        Close  PostgreSQL  connection.
 
-        Ensures proper cleanup of connection resources when exiting the with block.
+        Ensures proper cleanup of connection resources.
         """
-        if hasattr(self, "conn"):
+        if self.conn:
             try:
                 self.conn.close()
+                self.conn = None
             except Exception as e:
                 pass
 
-    def get_table_info(self, conn, table_names=None, schema=None):
+    def __enter__(self):
+        """
+        Establish PostgreSQL connection and return self.
+
+        Returns:
+            SnowflakeConn: Self instance with active connection.
+
+        Raises:
+            DatabaseConnectionError: If connection fails.
+        """
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Close PostgreSQL  connection on context manager exit.
+
+        Ensures proper cleanup of connection resources when exiting the with block.
+        """
+        self.close()
+
+    def _get_table_info(self, table_names=None, schema=None):
         """
         Retrieve column names and data types for specified tables in a schema.
 
@@ -98,7 +120,7 @@ class PostgresConn:
 
         results = {}
         try:
-            cursor = conn.cursor()
+            cursor = self.conn.cursor()
             for table_name in table_names:
                 try:
                     cursor.execute(
@@ -128,7 +150,7 @@ class PostgresConn:
             raise DatabaseConnectionError(f"Error in get_table_info: {e}") from e
         return results
 
-    def group_tables_by_type(self, conn, table_names=None, schema=None):
+    def _group_tables_by_type(self, table_names=None, schema=None):
         """
         Group columns of tables by their PostgreSQL data type categories.
 
@@ -158,7 +180,7 @@ class PostgresConn:
         bool_types = {"boolean", "bool"}
 
         try:
-            table_info = self.get_table_info(conn, table_names, schema)
+            table_info = self._get_table_info(table_names, schema)
             grouped = {}
 
             for (schema, table), columns in table_info.items():
@@ -178,7 +200,7 @@ class PostgresConn:
         except Exception as e:
             raise DatabaseConnectionError(f"Error in group_tables_by_type: {e}") from e
 
-    def table_exists(self, conn, schema, table):
+    def _table_exists(self, schema, table):
         """
         Check if a table exists in the given schema.
 
@@ -194,7 +216,7 @@ class PostgresConn:
             DatabaseConnectionError: On query or connection errors.
         """
         try:
-            cursor = conn.cursor()
+            cursor = self.conn.cursor()
             cursor.execute(
                 """
                 SELECT 1 FROM information_schema.tables
@@ -215,7 +237,7 @@ class PostgresConn:
         except Exception as e:
             raise DatabaseConnectionError(f"Unexpected error in table_exists: {e}") from e
 
-    def get_tables_in_schema(self, conn, schema):
+    def _get_tables_in_schema(self, schema):
         """
         Retrieve all table names in a given schema.
 
@@ -231,7 +253,7 @@ class PostgresConn:
         """
         tables = []
         try:
-            cursor = conn.cursor()
+            cursor = self.conn.cursor()
             try:
                 cursor.execute(
                     """
@@ -259,7 +281,7 @@ class PostgresConn:
             raise DatabaseConnectionError(f"Error in get_tables_in_schema:{e}") from e
         return tables
 
-    def get_table_hashes(self, conn, table_names=None, schema=None, batch_size=50000):
+    def _get_table_hashes(self, table_names=None, schema=None, batch_size=50000):
         """
         Calculate hash values for specified tables using PostgreSQL's hashtext function.
 
@@ -284,10 +306,10 @@ class PostgresConn:
 
         results = {}
         try:
-            cursor = conn.cursor()
+            cursor = self.conn.cursor()
             for table in table_names:
                 try:
-                    if self.table_exists(conn, schema, table):
+                    if self._table_exists(schema, table):
                         offset, total_hash = 0, 0
                         while True:
                             query = f"""SELECT SUM(hashtext(t::text)) FROM 
@@ -320,7 +342,7 @@ class PostgresConn:
             raise DatabaseConnectionError(f"Error in get_table_hashes: {e}") from e
         return results
 
-    def get_group_data(self, conn, schema=None, table_names=None, batch_size=50000):
+    def get_group_data(self, schema=None, table_names=None, batch_size=50000):
         """
         Retrieve column data in batches grouped by type for profiling.
 
@@ -346,13 +368,13 @@ class PostgresConn:
         try:
             if table_names:
                 for table in table_names:
-                    if self.table_exists(conn, schema, table):
+                    if self._table_exists(schema, table):
                         valid_tables.append(table)
             else:
-                valid_tables = self.get_tables_in_schema(conn, schema)
+                valid_tables = self._get_tables_in_schema(schema)
 
-            table_info = self.get_table_info(conn, table_names=valid_tables, schema=schema)
-            groups = self.group_tables_by_type(conn, table_names=valid_tables, schema=schema)
+            table_info = self._get_table_info(table_names=valid_tables, schema=schema)
+            groups = self._group_tables_by_type(table_names=valid_tables, schema=schema)
 
             for (sch, table), group_cols in groups.items():
                 raw_cols = table_info.get((sch, table), [])
@@ -367,12 +389,12 @@ class PostgresConn:
                     key = f"{sch}.{table}.{group}"
                     col_str = ", ".join(f'"{col}"' for col in columns)
 
-                    def fetch_batches():
+                    def _fetch_batches():
                         offset = 0
                         while True:
                             batch_query = f"""SELECT {col_str} FROM "{sch}"."{table}" 
                             LIMIT {batch_size} OFFSET {offset}"""
-                            cur = conn.cursor()
+                            cur = self.conn.cursor()
                             try:
                                 cur.execute(batch_query)
                                 rows = cur.fetchall()
@@ -403,7 +425,7 @@ class PostgresConn:
                             offset += batch_size
 
                     try:
-                        group_df = pd.concat(fetch_batches(), ignore_index=True)
+                        group_df = pd.concat(_fetch_batches(), ignore_index=True)
                         yield key, group_df
                     except Exception as e:
                         raise DatabaseConnectionError(f"Error in get_group_data for {key}") from e

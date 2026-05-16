@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Optional
+from typing import List, Optional, Union
 
 import pandas as pd
 import snowflake.connector
@@ -41,13 +41,14 @@ class SnowflakeConn:
     warehouse: str
     schema: Optional[str] = None
     role: Optional[str] = None
+    conn: Optional[snowflake.connector.SnowflakeConnection] = None
 
-    def __enter__(self):
+    def connect(self):
         """
-        Establish Snowflake connection and return connection instance.
+        Establish Snowflake connection and store it in self.conn.
 
         Returns:
-            snowflake.connector.connect: Authenticated Snowflake connection.
+            snowflake.connector.SnowflakeConnection: Authenticated Snowflake connection.
 
         Raises:
             DatabaseConnectionError: If connection fails.
@@ -69,24 +70,45 @@ class SnowflakeConn:
         except (snowflake.connector.errors.Error, Exception) as e:
             raise DatabaseConnectionError(f"Snowflake connection failed: {e}") from e
 
+    def close(self):
+        """
+        Close Snowflake connection.
+
+        Ensures proper cleanup of connection resources.
+        """
+        if self.conn:
+            try:
+                self.conn.close()
+                self.conn = None
+            except Exception as e:
+                pass
+
+    def __enter__(self):
+        """
+        Establish Snowflake connection and return self.
+
+        Returns:
+            SnowflakeConn: Self instance with active connection.
+
+        Raises:
+            DatabaseConnectionError: If connection fails.
+        """
+        self.connect()
+        return self
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
         Close Snowflake connection on context manager exit.
 
         Ensures proper cleanup of connection resources when exiting the with block.
         """
-        if hasattr(self, "conn"):
-            try:
-                self.conn.close()
-            except Exception as e:
-                pass
+        self.close()
 
-    def get_table_info(self, conn, table_names=None, schemas=None):
+    def _get_table_info(self, table_names=None, schemas=None):
         """
         Retrieve column names and data types for specified tables in schemas.
 
         Args:
-            conn: Active Snowflake connection.
             table_names (list or str): Table names to retrieve info for.
             schemas (list or str): Schema names.
 
@@ -106,9 +128,14 @@ class SnowflakeConn:
         if isinstance(schemas, str):
             schemas = [schemas]
 
+        if not self.conn:
+            raise DatabaseConnectionError(
+                "No active connection. Call connect() first or use context manager."
+            )
+
         results = {}
         try:
-            cursor = conn.cursor()
+            cursor = self.conn.cursor()
             for schema in schemas:
                 for table_name in table_names:
                     try:
@@ -131,12 +158,11 @@ class SnowflakeConn:
             raise DatabaseConnectionError(f"Error in get_table_info: {e}") from e
         return results
 
-    def group_tables_by_type(self, conn, table_names=None, schemas=None):
+    def _group_tables_by_type(self, table_names=None, schemas=None):
         """
         Group columns of tables by their Snowflake data type categories.
 
         Args:
-            conn: Active Snowflake connection.
             table_names (list or str): Table names to group.
             schemas (list or str): Schema names.
 
@@ -161,7 +187,7 @@ class SnowflakeConn:
         bool_types = {"boolean", "bool"}
 
         try:
-            table_info = self.get_table_info(conn, table_names, schemas)
+            table_info = self._get_table_info(table_names, schemas)
             grouped = {}
 
             for (schema, table), columns in table_info.items():
@@ -181,12 +207,11 @@ class SnowflakeConn:
         except Exception as e:
             raise DatabaseConnectionError(f"Error in group_tables_by_type: {e}") from e
 
-    def table_exists(self, conn, schema, table):
+    def _table_exists(self, schema: str, table: str):
         """
         Check if a table exists in the given schema.
 
         Args:
-            conn: Active Snowflake connection.
             schema (str): Schema name.
             table (str): Table name.
 
@@ -196,9 +221,14 @@ class SnowflakeConn:
         Raises:
             DatabaseConnectionError: On query or connection errors.
         """
+        if not self.conn:
+            raise DatabaseConnectionError(
+                "No active connection. Call connect() first or use context manager."
+            )
+
         try:
             print(f"Checking {schema}, table {table}")
-            cursor = conn.cursor()
+            cursor = self.conn.cursor()
             cursor.execute(f"""
                 SELECT 1 FROM information_schema.tables
                 WHERE table_schema = '{schema}' AND table_name = '{table}'
@@ -210,12 +240,14 @@ class SnowflakeConn:
         except (snowflake.connector.errors.Error, Exception) as e:
             raise DatabaseConnectionError(f"Error in table_exists: {e}") from e
 
-    def get_tables_in_schemas(self, conn, schemas):
+    def _get_tables_in_schemas(
+        self,
+        schemas: Union[str, List[str]],
+    ):
         """
         Retrieve all table names in given schemas.
 
         Args:
-            conn: Active Snowflake connection.
             schemas (list or str): Schema names.
 
         Returns:
@@ -224,11 +256,16 @@ class SnowflakeConn:
         Raises:
             DatabaseConnectionError: On query or connection errors.
         """
+        if not self.conn:
+            raise DatabaseConnectionError(
+                "No active connection. Call connect() first or use context manager."
+            )
+
         if isinstance(schemas, str):
             schemas = [schemas]
         tables = []
         try:
-            cursor = conn.cursor()
+            cursor = self.conn.cursor()
             for schema in schemas:
                 try:
                     cursor.execute(
@@ -249,12 +286,11 @@ class SnowflakeConn:
             raise DatabaseConnectionError(f"Error in get_tables_in_schemas: {e}") from e
         return tables
 
-    def get_table_hashes(self, conn, table_names=None, schemas=None) -> int:
+    def _get_table_hashes(self, table_names=None, schemas=None) -> dict:
         """
         Calculate hash values for specified tables using Snowflake's HASH_AGG.
 
         Args:
-            conn: Active Snowflake connection.
             table_names (list or str): Table names to hash.
             schemas (list or str): Schema names.
 
@@ -264,6 +300,11 @@ class SnowflakeConn:
         Raises:
             DatabaseConnectionError: On query or connection errors.
         """
+        if not self.conn:
+            raise DatabaseConnectionError(
+                "No active connection. Call connect() first or use context manager."
+            )
+
         if table_names is None:
             raise ValueError("table_names must be provided")
         if schemas is None:
@@ -275,11 +316,11 @@ class SnowflakeConn:
 
         results = {}
         try:
-            cursor = conn.cursor()
+            cursor = self.conn.cursor()
             for schema in schemas:
                 for table in table_names:
                     try:
-                        if self.table_exists(conn, schema, table):
+                        if self._table_exists(schema, table):
                             query = f'SELECT HASH_AGG(*) FROM "{schema}"."{table}"'
                             cursor.execute(query)
                             full_hash = cursor.fetchone()[0]
@@ -295,12 +336,11 @@ class SnowflakeConn:
             raise DatabaseConnectionError(f"Error in get_table_hashes: {e}") from e
         return results
 
-    def get_group_data(self, conn, schemas=None, table_names=None, batch_size=50000):
+    def get_group_data(self, schemas=None, table_names=None, batch_size=50000):
         """
         Retrieve column data in batches grouped by type for profiling.
 
         Args:
-            conn: Active Snowflake connection.
             schemas (list or str): Schema names.
             table_names (list or str): Table names to process.
             batch_size (int): Number of rows per query batch.
@@ -312,6 +352,11 @@ class SnowflakeConn:
         Raises:
             DatabaseConnectionError: On query or connection errors.
         """
+        if not self.conn:
+            raise DatabaseConnectionError(
+                "No active connection. Call connect() first or use context manager."
+            )
+
         if schemas is None:
             schemas = ["snowflake"]
         if isinstance(schemas, str):
@@ -324,10 +369,10 @@ class SnowflakeConn:
             for schema in schemas:
                 if table_names:
                     for table in table_names:
-                        if self.table_exists(conn, schema, table):
+                        if self._table_exists(schema, table):
                             valid_tables.add((schema, table))
                 else:
-                    tables = self.get_tables_in_schemas(conn, [schema])
+                    tables = self._get_tables_in_schemas([schema])
                     for sch, tbl in tables:
                         valid_tables.add((sch, tbl))
 
@@ -336,8 +381,8 @@ class SnowflakeConn:
                 schema_table_map[schema].append(table)
 
             for schema, tables in schema_table_map.items():
-                table_info = self.get_table_info(conn, table_names=tables, schemas=[schema])
-                groups = self.group_tables_by_type(conn, table_names=tables, schemas=[schema])
+                table_info = self._get_table_info(table_names=tables, schemas=[schema])
+                groups = self._group_tables_by_type(table_names=tables, schemas=[schema])
 
                 for (sch, table), group_cols in groups.items():
                     raw_cols = table_info.get((sch, table), [])
@@ -353,12 +398,12 @@ class SnowflakeConn:
                         key = f"{sch}.{table}.{group}"
                         col_str = ", ".join(f'"{col}"' for col in columns)
 
-                        def fetch_batches():
+                        def _fetch_batches():
                             offset = 0
                             while True:
                                 batch_query = f"""SELECT {col_str} FROM "{sch}"."{table}" 
                                 LIMIT {batch_size} OFFSET {offset}"""
-                                cur = conn.cursor()
+                                cur = self.conn.cursor()
                                 try:
                                     cur.execute(batch_query)
                                     rows = cur.fetchall()
@@ -379,7 +424,7 @@ class SnowflakeConn:
                                 offset += batch_size
 
                         try:
-                            group_df = pd.concat(fetch_batches(), ignore_index=True)
+                            group_df = pd.concat(_fetch_batches(), ignore_index=True)
                             yield key, group_df
                         except Exception as e:
                             raise DatabaseConnectionError(

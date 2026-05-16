@@ -1,20 +1,16 @@
 import datetime
 import json
 import os
-from typing import List, Literal, Optional
-
-from driftmon.detect.profiler import SummaryStats
+from typing import List, Literal, Optional, Union
 
 
 def save_profile(
     conn_type: Literal["postgres", "snowflake", "mysql", "bigquery"],
     connector,
-    conn,
     output_file: str = "monitoring_history.jsonl",
-    table_names: Optional[List[str]] = None,
-    schema: Optional[str] = None,
-    schemas: Optional[List[str]] = None,
-    datasets: Optional[List[str]] = None,
+    table_names: Optional[Union[str, List[str]]] = None,
+    schemas: Optional[Union[str, List[str]]] = None,
+    datasets: Optional[Union[str, List[str]]] = None,
 ):
     """
     Profiles tables from a database connection and saves the results to a monitoring history file.
@@ -39,6 +35,14 @@ def save_profile(
         str: Status message indicating success or failure.
     """
     reports = []
+    from driftmon.detect.profiler import SummaryStats
+
+    if isinstance(datasets, str):
+        datasets = [datasets]
+    if isinstance(table_names, str):
+        table_names = [table_names]
+    if isinstance(schemas, str):
+        schemas = [schemas]
 
     if table_names:
         table_names = [t for t in table_names if t]
@@ -57,12 +61,12 @@ def save_profile(
         dataset_location_cache = {}
         for dataset in datasets:
             if dataset not in dataset_location_cache:
-                location = connector.get_dataset_location(conn, dataset)
+                location = connector._get_dataset_location(dataset)
                 dataset_location_cache[dataset] = location or "US"
 
             resolved_location = dataset_location_cache[dataset]
-            hashes = connector.get_table_hashes(
-                conn, datasets=[dataset], table_names=table_names, location=resolved_location
+            hashes = connector._get_table_hashes(
+                datasets=[dataset], table_names=table_names, location=resolved_location
             )
 
             for table in table_names:
@@ -71,11 +75,11 @@ def save_profile(
                 if h_key not in hashes:
                     continue
 
-                table_id = f"{conn.project}.{dataset}.{table}"
+                table_id = f"{connector.project}.{dataset}.{table}"
                 metrics = {}
 
                 for key, group_df in connector.get_group_data(
-                    conn, datasets=[dataset], table_names=[table], location=resolved_location
+                    datasets=[dataset], table_names=[table], location=resolved_location
                 ):
                     if group_df is None or (hasattr(group_df, "empty") and group_df.empty):
                         continue
@@ -110,7 +114,7 @@ def save_profile(
                     reports.append(report)
 
     elif conn_type == "snowflake":
-        hashes = connector.get_table_hashes(conn, table_names=table_names, schemas=schemas or [])
+        hashes = connector._get_table_hashes(table_names=table_names, schemas=schemas or [])
 
         for s in schemas or []:
             for table in table_names:
@@ -122,9 +126,7 @@ def save_profile(
                 table_id = f"{s}.{table}"
                 metrics = {}
 
-                for key, group_df in connector.get_group_data(
-                    conn, schemas=[s], table_names=[table]
-                ):
+                for key, group_df in connector.get_group_data(schemas=[s], table_names=[table]):
                     if group_df is None or (hasattr(group_df, "empty") and group_df.empty):
                         continue
 
@@ -158,7 +160,10 @@ def save_profile(
                     reports.append(report)
 
     else:
-        hashes = connector.get_table_hashes(conn, table_names=table_names, schema=schema)
+        if not schemas or not schema[0]:
+            return "⚠️ No Schema provided for MySQL/PostgreSQL"
+        schema = schemas[0]
+        hashes = connector._get_table_hashes(table_names=table_names, schema=schema)
 
         for table in table_names:
             h_key = (schema, table)
@@ -169,7 +174,7 @@ def save_profile(
             table_id = f"{schema}.{table}" if schema else table
             metrics = {}
 
-            for key, group_df in connector.get_group_data(conn, schema=schema, table_names=[table]):
+            for key, group_df in connector.get_group_data(schema=schema, table_names=[table]):
                 if group_df is None or (hasattr(group_df, "empty") and group_df.empty):
                     continue
 

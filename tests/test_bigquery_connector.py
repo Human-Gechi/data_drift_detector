@@ -13,21 +13,43 @@ def bigquery_conn():
     return conn
 
 
-@patch("src.connector.bigquery_connector.service_account.Credentials.from_service_account_file")
-@patch("src.connector.bigquery_connector.bigquery.Client")
-def test__enter_and__exit(mock_client, mock_creds, bigquery_conn):
+@patch(
+    "driftmon.connector.bigquery_connector.service_account.Credentials.from_service_account_file"
+)
+@patch("driftmon.connector.bigquery_connector.bigquery.Client")
+def test_connect_and_close(mock_client, mock_creds, bigquery_conn):
     mock_creds.return_value = MagicMock()
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
 
-    with bigquery_conn as client:
-        assert client == mock_client_instance
-        assert hasattr(bigquery_conn, "conn")
+    result = bigquery_conn.connect()
+    assert result == mock_client_instance
+    assert bigquery_conn.conn == mock_client_instance
+
+    bigquery_conn.close()
     mock_client_instance.close.assert_called_once()
+    assert bigquery_conn.conn is None
 
 
-@patch("src.connector.bigquery_connector.service_account.Credentials.from_service_account_file")
-@patch("src.connector.bigquery_connector.bigquery.Client")
+@patch(
+    "driftmon.connector.bigquery_connector.service_account.Credentials.from_service_account_file"
+)
+@patch("driftmon.connector.bigquery_connector.bigquery.Client")
+def test_context_manager(mock_client, mock_creds, bigquery_conn):
+    mock_creds.return_value = MagicMock()
+    mock_client_instance = MagicMock()
+    mock_client.return_value = mock_client_instance
+
+    with bigquery_conn as conn:
+        assert conn.conn == mock_client_instance
+    mock_client_instance.close.assert_called_once()
+    assert bigquery_conn.conn is None
+
+
+@patch(
+    "driftmon.connector.bigquery_connector.service_account.Credentials.from_service_account_file"
+)
+@patch("driftmon.connector.bigquery_connector.bigquery.Client")
 def test_get_dataset_location(mock_client, mock_creds, bigquery_conn):
     mock_creds.return_value = MagicMock()
     mock_client_instance = MagicMock()
@@ -39,13 +61,15 @@ def test_get_dataset_location(mock_client, mock_creds, bigquery_conn):
     mock_client_instance.get_dataset.return_value = mock_dataset
 
     with bigquery_conn as client:
-        location = bigquery_conn.get_dataset_location(client, "my_dataset")
+        location = client._get_dataset_location("my_dataset")
         assert location == "US"
         mock_client_instance.get_dataset.assert_called_once_with("test-project.my_dataset")
 
 
-@patch("src.connector.bigquery_connector.service_account.Credentials.from_service_account_file")
-@patch("src.connector.bigquery_connector.bigquery.Client")
+@patch(
+    "driftmon.connector.bigquery_connector.service_account.Credentials.from_service_account_file"
+)
+@patch("driftmon.connector.bigquery_connector.bigquery.Client")
 def test_dataset_exists(mock_client, mock_creds, bigquery_conn):
     mock_creds.return_value = MagicMock()
     mock_client_instance = MagicMock()
@@ -55,12 +79,14 @@ def test_dataset_exists(mock_client, mock_creds, bigquery_conn):
     mock_client_instance.get_dataset.return_value = True
 
     with bigquery_conn as client:
-        bigquery_conn.dataset_exists(client, "my_dataset")
+        client._dataset_exists("my_dataset")
         mock_client_instance.get_dataset.assert_called_once_with("test-project.my_dataset")
 
 
-@patch("src.connector.bigquery_connector.service_account.Credentials.from_service_account_file")
-@patch("src.connector.bigquery_connector.bigquery.Client")
+@patch(
+    "driftmon.connector.bigquery_connector.service_account.Credentials.from_service_account_file"
+)
+@patch("driftmon.connector.bigquery_connector.bigquery.Client")
 def test_dataset_not_exists(mock_client, mock_creds, bigquery_conn):
     mock_creds.return_value = MagicMock()
     mock_client_instance = MagicMock()
@@ -69,13 +95,15 @@ def test_dataset_not_exists(mock_client, mock_creds, bigquery_conn):
     mock_client_instance.get_dataset.side_effect = NotFound(False)
 
     with bigquery_conn as client:
-        result = bigquery_conn.dataset_exists(client, "my_dataset")
+        result = client._dataset_exists("my_dataset")
         assert result is False
         mock_client_instance.get_dataset.assert_called_once_with("test-project.my_dataset")
 
 
-@patch("src.connector.bigquery_connector.service_account.Credentials.from_service_account_file")
-@patch("src.connector.bigquery_connector.bigquery.Client")
+@patch(
+    "driftmon.connector.bigquery_connector.service_account.Credentials.from_service_account_file"
+)
+@patch("driftmon.connector.bigquery_connector.bigquery.Client")
 def test_table_exists(mock_client, mock_creds, bigquery_conn):
     mock_creds.return_value = MagicMock()
     mock_client_instance = MagicMock()
@@ -83,13 +111,15 @@ def test_table_exists(mock_client, mock_creds, bigquery_conn):
     mock_client.return_value = mock_client_instance
 
     with bigquery_conn as client:
-        result = bigquery_conn.table_exists(client, "my_dataset", "my_table")
+        result = client._table_exists("my_dataset", "my_table")
         assert result is True
         mock_client_instance.get_table.assert_called_once_with("test-project.my_dataset.my_table")
 
 
-@patch("src.connector.bigquery_connector.service_account.Credentials.from_service_account_file")
-@patch("src.connector.bigquery_connector.bigquery.Client")
+@patch(
+    "driftmon.connector.bigquery_connector.service_account.Credentials.from_service_account_file"
+)
+@patch("driftmon.connector.bigquery_connector.bigquery.Client")
 def test_table_not_exists(mock_client, mock_creds, bigquery_conn):
     mock_creds.return_value = MagicMock()
     mock_client_instance = MagicMock()
@@ -98,21 +128,23 @@ def test_table_not_exists(mock_client, mock_creds, bigquery_conn):
     mock_client_instance.get_table.side_effect = NotFound(False)
 
     with bigquery_conn as client:
-        result = bigquery_conn.table_exists(client, "my_dataset", "my_table")
+        result = client._table_exists("my_dataset", "my_table")
         assert result is False
         mock_client_instance.get_table.assert_called_once_with("test-project.my_dataset.my_table")
 
 
-@patch("src.connector.bigquery_connector.service_account.Credentials.from_service_account_file")
-@patch("src.connector.bigquery_connector.bigquery.Client")
+@patch(
+    "driftmon.connector.bigquery_connector.service_account.Credentials.from_service_account_file"
+)
+@patch("driftmon.connector.bigquery_connector.bigquery.Client")
 def test_get_table_hashes(mock_client, mock_creds, bigquery_conn):
     mock_creds.return_value = MagicMock()
     mock_client_instance = MagicMock()
     mock_client_instance.project = "test-project"
     mock_client.return_value = mock_client_instance
 
-    bigquery_conn.table_exists = MagicMock(return_value=True)
-    bigquery_conn.get_dataset_location = MagicMock(return_value="US")
+    bigquery_conn._table_exists = MagicMock(return_value=True)
+    bigquery_conn._get_dataset_location = MagicMock(return_value="US")
 
     mock_query_job = MagicMock()
     mock_query_job.result.return_value = [(-123456789,)]
@@ -122,13 +154,15 @@ def test_get_table_hashes(mock_client, mock_creds, bigquery_conn):
     tables = ["table1"]
 
     with bigquery_conn as client:
-        result = bigquery_conn.get_table_hashes(client, datasets, tables)
+        result = client._get_table_hashes(datasets, tables)
         assert result == {("dataset1", "table1"): -123456789}
         mock_client_instance.query.assert_called_once()
 
 
-@patch("src.connector.bigquery_connector.service_account.Credentials.from_service_account_file")
-@patch("src.connector.bigquery_connector.bigquery.Client")
+@patch(
+    "driftmon.connector.bigquery_connector.service_account.Credentials.from_service_account_file"
+)
+@patch("driftmon.connector.bigquery_connector.bigquery.Client")
 def test_group_columns_by_type(mock_client, mock_creds, bigquery_conn):
     mock_creds.return_value = MagicMock()
     mock_client_instance = MagicMock()
@@ -170,21 +204,23 @@ def test_group_columns_by_type(mock_client, mock_creds, bigquery_conn):
     table = "table1"
 
     with bigquery_conn as client:
-        result = bigquery_conn.group_columns_by_type(client, dataset, table)
+        result = client._group_columns_by_type(dataset, table)
         assert result == groups
         mock_client_instance.get_table.assert_called_once_with("test-project.dataset1.table1")
 
 
-@patch("src.connector.bigquery_connector.service_account.Credentials.from_service_account_file")
-@patch("src.connector.bigquery_connector.bigquery.Client")
+@patch(
+    "driftmon.connector.bigquery_connector.service_account.Credentials.from_service_account_file"
+)
+@patch("driftmon.connector.bigquery_connector.bigquery.Client")
 def test_available_dtypes(mock_client, mock_creds, bigquery_conn):
     mock_creds.return_value = MagicMock()
     mock_client_instance = MagicMock()
     mock_client_instance.project = "test-project"
     mock_client.return_value = mock_client_instance
 
-    bigquery_conn.table_exists = MagicMock(return_value=True)
-    bigquery_conn.dataset_exists = MagicMock(return_value=True)
+    bigquery_conn._table_exists = MagicMock(return_value=True)
+    bigquery_conn._dataset_exists = MagicMock(return_value=True)
 
     mock_field1 = MagicMock()
     mock_field1.field_type = "STRING"
@@ -200,23 +236,25 @@ def test_available_dtypes(mock_client, mock_creds, bigquery_conn):
     table = "my_table"
 
     with bigquery_conn as client:
-        result = bigquery_conn.available_dtypes(client, dataset, table)
+        result = client._available_dtypes(dataset, table)
         assert result == dtypes
         mock_client_instance.get_table.assert_called_once_with("test-project.my_dataset.my_table")
 
 
-@patch("src.connector.bigquery_connector.service_account.Credentials.from_service_account_file")
-@patch("src.connector.bigquery_connector.bigquery.Client")
+@patch(
+    "driftmon.connector.bigquery_connector.service_account.Credentials.from_service_account_file"
+)
+@patch("driftmon.connector.bigquery_connector.bigquery.Client")
 def test_get_group_data(mock_client, mock_creds, bigquery_conn):
     mock_creds.return_value = MagicMock()
     mock_client_instance = MagicMock()
     mock_client_instance.project = "test-project"
     mock_client.return_value = mock_client_instance
 
-    bigquery_conn.get_dataset_location = MagicMock(return_value="EU")
-    bigquery_conn.table_exists = MagicMock(return_value=True)
-    bigquery_conn.available_dtypes = MagicMock(return_value=set({"STRING", "DATE"}))
-    bigquery_conn.group_columns_by_type = MagicMock(
+    bigquery_conn._get_dataset_location = MagicMock(return_value="EU")
+    bigquery_conn._table_exists = MagicMock(return_value=True)
+    bigquery_conn._available_dtypes = MagicMock(return_value=set({"STRING", "DATE"}))
+    bigquery_conn._group_columns_by_type = MagicMock(
         return_value={
             "numerical": [],
             "text": ["col_text"],
@@ -238,7 +276,7 @@ def test_get_group_data(mock_client, mock_creds, bigquery_conn):
     tables = ["my_table"]
 
     with bigquery_conn as client:
-        results = list(bigquery_conn.get_group_data(client, datasets, tables, batch_size=2))
+        results = list(client.get_group_data(datasets, tables, batch_size=2))
         assert results
         key, result_df = results[0]
         assert key == "test-project.my_dataset.my_table.text"

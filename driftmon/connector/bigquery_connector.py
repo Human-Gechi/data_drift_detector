@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, Generator, List, Optional, Tuple
+from typing import Dict, Generator, List, Optional, Tuple, Union
 
 import pandas as pd
 from google.api_core.exceptions import BadRequest, Forbidden, NotFound
@@ -48,7 +48,7 @@ class BigQueryConn:
     credentials_path: Optional[str] = None
     location: Optional[str] = None
 
-    def __enter__(self):
+    def connect(self):
         """Establish BigQuery connection and return client instance.
         Initializes BigQuery client using either service account credentials
         (if credentials_path provided) or Application Default Credentials.
@@ -80,14 +80,22 @@ class BigQueryConn:
         except Exception as e:
             raise DatabaseConnectionError(f"BigQuery connection failed: {e}")
 
+    def __enter__(self):
+        self.connect()
+        return self
+
+    def close(self):
+        if hasattr(self, "conn") and self.conn:
+            self.conn.close()
+            self.conn = None
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Close BigQuery connection on context manager exit.
         Ensures proper cleanup of connection resources when exiting the with block.
         """
-        if hasattr(self, "conn"):
-            self.conn.close()
+        self.close()
 
-    def get_dataset_location(self, conn, dataset: str) -> Optional[str]:
+    def _get_dataset_location(self, dataset: str) -> Optional[str]:
         """Retrieve the location (region) of a BigQuery dataset.
 
         Args:
@@ -98,15 +106,15 @@ class BigQueryConn:
             Optional[str]: Dataset location (e.g., 'US', 'EU') or None if not found
         """
         try:
-            dataset_ref = f"{conn.project}.{dataset}"
-            dataset_obj = conn.get_dataset(dataset_ref)
+            dataset_ref = f"{self.conn.project}.{dataset}"
+            dataset_obj = self.conn.get_dataset(dataset_ref)
             return dataset_obj.location
         except NotFound:
             raise DatabaseConnectionError(f"Dataset not found: {dataset}")
         except Exception as e:
             raise DatabaseConnectionError(f"Error retrieving dataset location: {e}")
 
-    def dataset_exists(self, conn, dataset: str) -> bool:
+    def _dataset_exists(self, dataset: str) -> bool:
         """Check if a dataset exists in the connected project.
         Args:
             conn (bigquery.Client): Active BigQuery connection
@@ -116,14 +124,14 @@ class BigQueryConn:
             bool: True if dataset exists, False otherwise
         """
         try:
-            conn.get_dataset(f"{conn.project}.{dataset}")
+            self.conn.get_dataset(f"{self.conn.project}.{dataset}")
             return True
         except NotFound:
             return False
         except Exception as e:
             raise DatabaseConnectionError(f"Error checking dataset existence: {e}")
 
-    def table_exists(self, conn, dataset: str, table_name: str) -> bool:
+    def _table_exists(self, dataset: str, table_name: str) -> bool:
         """Check if a table exists in the connected project.
         Args:
             conn (bigquery.Client): Active BigQuery connection
@@ -134,16 +142,16 @@ class BigQueryConn:
             bool: True if table exists, False otherwise
         """
         try:
-            table_ref = f"{conn.project}.{dataset}.{table_name}"
-            conn.get_table(table_ref)
+            table_ref = f"{self.conn.project}.{dataset}.{table_name}"
+            self.conn.get_table(table_ref)
             return True
         except NotFound:
             return False
         except Exception as e:
             raise DatabaseConnectionError(f"Error checking table existence: {e}")
 
-    def get_table_hashes(
-        self, conn, datasets: List[str], table_names: List[str], location: Optional[str] = None
+    def _get_table_hashes(
+        self, datasets: List[str], table_names: List[str], location: Optional[str] = None
     ) -> Dict[Tuple[str, str], Optional[int]]:
         """Calculate hash values for specified tables across datasets using fingerprinting.
 
@@ -165,7 +173,7 @@ class BigQueryConn:
         datasets_by_location = defaultdict(list)
         for dataset in datasets:
             try:
-                resolved_location = location or self.get_dataset_location(conn, dataset)
+                resolved_location = location or self._get_dataset_location(dataset)
                 if resolved_location:
                     datasets_by_location[resolved_location].append(dataset)
             except DatabaseConnectionError:
@@ -175,11 +183,11 @@ class BigQueryConn:
             for dataset in dataset_list:
                 for table_name in table_names:
                     try:
-                        if not self.table_exists(conn, dataset, table_name):
+                        if not self._table_exists(dataset, table_name):
                             continue
 
-                        table_ref = f"{conn.project}.{dataset}.{table_name}"
-                        query_job = conn.query(
+                        table_ref = f"{self.conn.project}.{dataset}.{table_name}"
+                        query_job = self.conn.query(
                             f"""SELECT BIT_XOR(FARM_FINGERPRINT(TO_JSON_STRING(t))) 
                             FROM `{table_ref}` AS t""",
                             location=loc,
@@ -196,7 +204,7 @@ class BigQueryConn:
 
         return results
 
-    def group_columns_by_type(self, conn, dataset: str, table_name: str) -> Dict[str, List[str]]:
+    def _group_columns_by_type(self, dataset: str, table_name: str) -> Dict[str, List[str]]:
         """Group table columns by their BigQuery data type categories.
 
         Categorizes columns into four profiling groups:
@@ -234,8 +242,8 @@ class BigQueryConn:
         bool_types = {"boolean", "bool"}
 
         try:
-            table_ref = f"{conn.project}.{dataset}.{table_name}"
-            table = conn.get_table(table_ref)
+            table_ref = f"{self.conn.project}.{dataset}.{table_name}"
+            table = self.conn.get_table(table_ref)
             groups = {"numerical": [], "text": [], "date": [], "boolean": []}
             for field in table.schema:
                 ftype = field.field_type.lower()
@@ -251,7 +259,7 @@ class BigQueryConn:
         except Exception as e:
             raise DatabaseConnectionError(f"Error grouping columns by type: {e}")
 
-    def available_dtypes(self, conn, dataset: str, table_name: str) -> Optional[set]:
+    def _available_dtypes(self, dataset: str, table_name: str) -> Optional[set]:
         """Get unique set of BigQuery data types present in a table's schema.
 
         Args:
@@ -264,22 +272,19 @@ class BigQueryConn:
                 Returns None if table/dataset doesn't exist or schema inaccessible
         """
         try:
-            if not (
-                self.table_exists(conn, dataset, table_name) and self.dataset_exists(conn, dataset)
-            ):
+            if not (self._table_exists(dataset, table_name) and self._dataset_exists(dataset)):
                 return None
 
-            table_ref = f"{conn.project}.{dataset}.{table_name}"
-            table = conn.get_table(table_ref)
+            table_ref = f"{self.conn.project}.{dataset}.{table_name}"
+            table = self.conn.get_table(table_ref)
             return set(field.field_type for field in table.schema)
         except Exception as e:
             raise DatabaseConnectionError(f"Error getting available dtypes: {e}")
 
     def get_group_data(
         self,
-        conn,
-        datasets: List[str],
-        table_names: List[str],
+        datasets: Union[str, List[str]],
+        table_names: Union[str, List[str]],
         batch_size: int = 50000,
         location: Optional[str] = None,
     ) -> Generator[Tuple[str, pd.DataFrame], None, None]:
@@ -302,10 +307,14 @@ class BigQueryConn:
                 where key format is "project.dataset.table.group" and DataFrame contains
                 the grouped columns' data.
         """
+        if isinstance(datasets, str):
+            datasets = [datasets]
+        if isinstance(table_names, str):
+            table_names = [table_names]
         datasets_by_location = defaultdict(list)
         for dataset in datasets:
             try:
-                resolved_location = location or self.get_dataset_location(conn, dataset)
+                resolved_location = location or self._get_dataset_location(dataset)
                 if resolved_location:
                     datasets_by_location[resolved_location].append(dataset)
             except DatabaseConnectionError:
@@ -315,18 +324,20 @@ class BigQueryConn:
             for dataset in dataset_list:
                 for table_name in table_names:
                     try:
-                        if not self.table_exists(conn, dataset, table_name):
-                            continue
+                        if not self._table_exists(dataset, table_name):
+                            raise DatabaseConnectionError(
+                                f"Table not found: {dataset}.{table_name}"
+                            )
 
-                        dtypes = self.available_dtypes(conn, dataset, table_name)
+                        dtypes = self._available_dtypes(dataset, table_name)
                         if not dtypes:
                             continue
 
-                        table_ref = f"{conn.project}.{dataset}.{table_name}"
-                        table = conn.get_table(table_ref)
+                        table_ref = f"{self.conn.project}.{dataset}.{table_name}"
+                        table = self.conn.get_table(table_ref)
                         total_rows = table.num_rows
 
-                        groups = self.group_columns_by_type(conn, dataset, table_name)
+                        groups = self._group_columns_by_type(dataset, table_name)
 
                         for group, columns in groups.items():
                             if not columns:
@@ -335,12 +346,12 @@ class BigQueryConn:
                             key = f"{table_ref}.{group}"
                             col_str = ", ".join([f"`{col}`" for col in columns])
 
-                            def fetch_batches():
+                            def _fetch_batches():
                                 for offset in range(0, total_rows, batch_size):
                                     query = f"""SELECT {col_str} FROM `{table_ref}` 
                                     LIMIT {batch_size} OFFSET {offset}"""
                                     try:
-                                        query_job = conn.query(query, location=loc)
+                                        query_job = self.conn.query(query, location=loc)
                                         df = query_job.to_dataframe()
                                         if df.empty:
                                             break
@@ -350,7 +361,7 @@ class BigQueryConn:
                                             f"Error fetching batch data: {e}"
                                         )
 
-                            batches = list(fetch_batches())
+                            batches = list(_fetch_batches())
                             if batches:
                                 group_df = pd.concat(batches, ignore_index=True)
                                 yield key, group_df

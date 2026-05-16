@@ -194,8 +194,8 @@ def monitoring():
     connector = create_connector_and_params(params)
 
     if timed_conn is None or not timed_conn.is_valid():
-        conn = connector.__enter__()
-        timed_conn = TimedConnection(conn, timeout=timeout)
+        connector.__enter__()
+        timed_conn = TimedConnection(connector, timeout=timeout)
         typer.secho(
             f"New connection established. Session valid for {timeout} seconds.",
             fg=typer.colors.BRIGHT_GREEN,
@@ -203,7 +203,7 @@ def monitoring():
     else:
         typer.secho("Using existing valid connection.", fg=typer.colors.BRIGHT_MAGENTA)
 
-    conn_obj = timed_conn.get_conn()
+    active_connector = timed_conn.get_conn()
 
     with Progress(
         SpinnerColumn(), TextColumn("[progress.description]{task.description}")
@@ -212,8 +212,7 @@ def monitoring():
 
         result = save_profile(
             conn_type=params["type"],
-            connector=connector,
-            conn=conn_obj,
+            connector=active_connector,
             table_names=tables if tables else None,
             schema=schema if params["type"] in ("mysql", "postgres") else None,
             schemas=schemas if params["type"] == "snowflake" else None,

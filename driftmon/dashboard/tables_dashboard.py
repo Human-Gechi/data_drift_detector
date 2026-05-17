@@ -19,6 +19,7 @@ st.title("📊 Data Drift Monitoring Dashboard")
 
 
 def read_file(file_path: str = "monitoring_history.jsonl"):
+    """Read file containing hashes and base profile stats"""
     records = []
     try:
         with open(file_path, "r") as f:
@@ -34,6 +35,7 @@ def read_file(file_path: str = "monitoring_history.jsonl"):
 
 
 def get_available_tables(records):
+    """Retrieve available tables grouped as Bigquery and the others"""
     bq_grouped = defaultdict(set)
     db_grouped = defaultdict(set)
     for record in records:
@@ -51,6 +53,7 @@ def get_available_tables(records):
 
 
 def extract_historical_numerical_data(records, table_name, column_name):
+    """Extract data for tables with numerical dtype"""
     timestamps = []
     bin_edges_list = []
     expected_percents_list = []
@@ -198,6 +201,21 @@ def calculate_js_divergence(p, q):
 
 
 def plot_numerical_drift(timestamps, bin_edges_list, expected_percents_list, column_name):
+    """
+    Visualize numerical column drift over time using PSI (Population Stability Index).
+
+    Plots PSI scores between snapshots and highlights drift severity with color-coded bands.
+    Also compares the latest and previous distributions using bar charts.
+
+    Args:
+        timestamps (list[datetime]): List of snapshot timestamps.
+        bin_edges_list (list[list[float]]): List of bin edges for each snapshot.
+        expected_percents_list (list[list[float]]): List of value proportions for each snapshot.
+        column_name (str): Name of the numerical column being analyzed.
+
+    Returns:
+        None
+    """
     if not timestamps or len(timestamps) < 2:
         st.warning(f"Need at least 2 snapshots to calculate drift for {column_name}")
         if timestamps:
@@ -293,7 +311,7 @@ def plot_numerical_drift(timestamps, bin_edges_list, expected_percents_list, col
                 - **PSI < 0.1**: No significant drift - distributions are similar
                 - **0.1 ≤ PSI < 0.25**: Moderate drift - some distribution changes detected
                 - **PSI ≥ 0.25**: Significant drift - major distribution shift detected
-                
+
                 PSI measures how much your numerical feature's distribution has changed over time.
                 """)
         else:
@@ -361,6 +379,22 @@ def plot_numerical_drift(timestamps, bin_edges_list, expected_percents_list, col
 def plot_categorical_drift(
     timestamps, top_labels_list, uniqueness_ratio_list, unique_values_list, column_name
 ):
+    """
+    Visualize categorical column drift over time using Jensen-Shannon Divergence (JSD).
+
+    Plots JSD scores between snapshots, highlights drift severity, and shows top category
+    frequency changes. Also displays uniqueness ratio trends and provides interpretation guides.
+
+    Args:
+        timestamps (list[datetime]): List of snapshot timestamps.
+        top_labels_list (list[dict]): List of top category counts for each snapshot.
+        uniqueness_ratio_list (list[float]): List of uniqueness ratios for each snapshot.
+        unique_values_list (list[int]): List of unique value counts for each snapshot.
+        column_name (str): Name of the categorical column being analyzed.
+
+    Returns:
+        None
+    """
     if not timestamps or len(timestamps) < 2:
         st.warning(f"Need at least 2 snapshots to calculate drift for {column_name}")
         if timestamps:
@@ -498,10 +532,10 @@ def plot_categorical_drift(
 
             if latest_jsd >= 0.35:
                 st.error(f"""
-                🚨 **EXTREME CATEGORICAL DRIFT DETECTED!** 
-                
+                🚨 **EXTREME CATEGORICAL DRIFT DETECTED!**
+
                 Latest JSD: **{latest_jsd:.4f}** (Very High Drift)
-                
+
                 **Immediate Action Required:**
                 - Category distribution has changed dramatically
                 - Check for data pipeline errors or upstream schema changes
@@ -512,9 +546,9 @@ def plot_categorical_drift(
             elif latest_jsd >= 0.20:
                 st.error(f"""
                 ⚠️ **HIGH CATEGORICAL DRIFT DETECTED!**
-                
+
                 Latest JSD: **{latest_jsd:.4f}** (High Drift)
-                
+
                 **Actions to Take:**
                 - Investigate what categories have changed significantly
                 - Consider retraining models that depend on this feature
@@ -524,9 +558,9 @@ def plot_categorical_drift(
             elif latest_jsd >= 0.10:
                 st.warning(f"""
                 📊 **MODERATE CATEGORICAL DRIFT DETECTED**
-                
+
                 Latest JSD: **{latest_jsd:.4f}** (Moderate Drift)
-                
+
                 **Recommended Actions:**
                 - Monitor this feature more closely
                 - Review category frequency changes in the comparison chart
@@ -552,14 +586,14 @@ def plot_categorical_drift(
             with st.expander("📖 Detailed JSD Interpretation Guide for Categorical Data"):
                 st.markdown("""
                 ### Jensen-Shannon Divergence (JSD) for Categorical/Text Data
-                
+
                 **What is JSD?**
                 - Measures similarity between two probability distributions
                 - Ranges from **0** (identical distributions) to **1** (completely different)
                 - Symmetric and bounded, making it easy to interpret
-                
+
                 **Interpretation Guidelines:**
-                
+
                 | JSD Range | Severity | Meaning | Business Impact |
                 |-----------|----------|---------|-----------------|
                 | **0.00 - 0.05** | Very Low | Distributions nearly identical | No impact |
@@ -568,12 +602,12 @@ def plot_categorical_drift(
                 | **0.20 - 0.35** | High | Significant change | Immediate investigation |
                 | **0.35 - 0.50** | Very High | Major divergence | Critical alert |
                 | **0.50 - 1.00** | Extreme | Completely different | System failure likely |
-                
+
                 **When to be concerned:**
                 - **Rapid increases** in JSD over short time periods
                 - **Sustained JSD > 0.10** for critical features
-                - **JSD > 0.20** for production ML models or data models 
-                
+                - **JSD > 0.20** for production ML models or data models
+
                 **Common causes of high JSD:**
                 1. Data pipeline errors or missing data
                 2. Changes in business logic or category definitions
@@ -689,7 +723,7 @@ def plot_categorical_drift(
             for cat, pct in zip(categories, pct_changes):
                 if pct == float("inf"):
                     st.warning(
-                        f"""🆕 **{cat}**:New category (was 0,now 
+                        f"""🆕 **{cat}**:New category (was 0,now
                         {latest_counts[categories.index(cat)]})"""
                     )
                 elif pct > 20:
@@ -754,6 +788,23 @@ def plot_categorical_drift(
 def plot_unstructured_text_drift(
     timestamps, avg_lengths, std_lengths, unique_values_list, uniqueness_ratio_list, column_name
 ):
+    """
+    Visualize drift in unstructured text columns over time.
+
+    Plots average and standard deviation of text lengths, as well as trends in unique value
+    counts and uniqueness ratios.
+
+    Args:
+        timestamps (list[datetime]): List of snapshot timestamps.
+        avg_lengths (list[float]): List of average text lengths for each snapshot.
+        std_lengths (list[float]): List of standard deviations of text lengths.
+        unique_values_list (list[int]): List of unique value counts for each snapshot.
+        uniqueness_ratio_list (list[float]): List of uniqueness ratios for each snapshot.
+        column_name (str): Name of the text column being analyzed.
+
+    Returns:
+        None
+    """
     if not timestamps or len(timestamps) < 2:
         st.warning(f"Need at least 2 snapshots to calculate drift for {column_name}")
         return
@@ -840,6 +891,25 @@ def plot_date_drift(
     selected_year=None,
     selected_month=None,
 ):
+    """
+    Visualize drift and completeness in date columns over time.
+
+    Plots min/max date values, data completeness, and unique date counts for each snapshot.
+    Allows filtering by year and month.
+
+    Args:
+        timestamps (list[datetime]): List of snapshot timestamps.
+        min_dates (list[float]): List of minimum date values (as timestamps).
+        max_dates (list[float]): List of maximum date values (as timestamps).
+        count_dates (list[int]): List of non-null date counts for each snapshot.
+        null_count (list[int]): List of null value counts for each snapshot.
+        column_name (str): Name of the date column being analyzed.
+        selected_year (int, optional): Year to filter by.
+        selected_month (int, optional): Month to filter by.
+
+    Returns:
+        None
+    """
     curr_null_count = null_count[-1]
     curr_count_dates = count_dates[-1]
 
@@ -928,6 +998,21 @@ def plot_date_drift(
 
 
 def plot_bool_drift(timestamps, counts, nulls, value_counts_list, column_name):
+    """
+    Visualize drift in boolean columns over time.
+
+    Plots value distributions for each snapshot, data completeness, and unique value counts.
+
+    Args:
+        timestamps (list[datetime]): List of snapshot timestamps.
+        counts (list[int]): List of non-null value counts for each snapshot.
+        nulls (list[int]): List of null value counts for each snapshot.
+        value_counts_list (list[dict]): List of value counts (True/False) for each snapshot.
+        column_name (str): Name of the boolean column being analyzed.
+
+    Returns:
+        None
+    """
     all_keys = set()
     for vc in value_counts_list:
         all_keys.update(vc.keys())
@@ -997,6 +1082,25 @@ def plot_bool_drift(timestamps, counts, nulls, value_counts_list, column_name):
 
 
 def main():
+    """
+    Main entry point for the Data Drift Monitoring Dashboard.
+
+    This function initializes and runs the Streamlit dashboard for visualizing data drift.
+    It loads monitoring history, allows users to select data sources and tables, and provides
+    interactive visualizations for numerical, categorical, date, boolean, and text columns.
+    Users can explore drift metrics, trends, and raw data for each column, as well as filter
+    results by date and time.
+
+    The dashboard supports:
+      - BigQuery and other database sources
+      - Selection of tables and columns for analysis
+      - Visualization of drift metrics (PSI, JSD, etc.)
+      - Timeline and update history for monitored tables
+      - Raw metrics inspection for advanced users
+
+    Returns:
+        None
+    """
     records = read_file()
 
     if not records:

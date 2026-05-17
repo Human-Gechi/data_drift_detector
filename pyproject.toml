@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Data drift detector for datasets, table datawhat"
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "MIT" }
+license = "MIT"
 authors = [
     { name = "Human-Gechi", email = "okoliogechi74@gmail.com" }
 ]

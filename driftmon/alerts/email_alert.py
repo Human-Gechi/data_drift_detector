@@ -19,6 +19,34 @@ _SMTP_SETTINGS = {
 
 
 class Email:
+    """
+    Email alert class for sending data drift notifications.
+
+    This class supports sending HTML-formatted drift reports via email using popular providers
+    (Gmail, Yahoo, Outlook). It uses Jinja2 templates for formatting the email body and supports
+    both SSL and TLS connections.
+
+    Args:
+        sender (str): Sender's email address.
+        password (str): Sender's email password or app password.
+        receiver (str): Recipient's email address.
+        drift_report (str): The drift report content to include in the email.
+        use_ssl (bool, optional): Whether to use SSL for the SMTP connection. Defaults to False.
+
+    Raises:
+        ValueError: If the email provider is not supported or drift_report is not provided.
+
+    Example:
+        email = Email(
+            sender="your_email@gmail.com",
+            password="your_password",
+            receiver="receiver@example.com",
+            drift_report="Drift detected in table X",
+            use_ssl=True
+        )
+        email.send_email()
+    """
+
     def __init__(
         self,
         sender: str,
@@ -45,6 +73,18 @@ class Email:
         self.smtp_port = settings["ssl_port"] if use_ssl else settings["tls_port"]
 
     def send_email(self, subject=_EMAIL_SUBJECT):
+        """
+        Send the drift report email to the configured receiver.
+
+        Args:
+            subject (str, optional): Subject line for the email. Defaults to "Data Drift Alert".
+
+        Raises:
+            ValueError: If drift_report is not provided.
+
+        Retries:
+            Attempts to send the email up to 5 times in case of failure.
+        """
         if self.drift_report is None:
             raise ValueError("Drift report must be provided!")
 

@@ -1,6 +1,11 @@
-# Driftmon: Data Drift Detection & Monitoring Tool
+# 📊🚦 Driftmon: Data Drift Detection & Monitoring Tool
+![PyPI](https://img.shields.io/pypi/v/driftmon) ![Python](https://img.shields.io/badge/python-3.11.9-blue)
+![License](https://img.shields.io/pypi/l/driftmon)
 
+> *The idea for Driftmon was inspired while reading **Fundamentals of Data Engineering**, where the importance of monitoring data drift in production systems was emphasized. Driftmon aims to provide a practical, extensible solution for real-world data drift detection, alerting, and monitoring across multiple data platforms.*
+---
 **Driftmon** is a robust tool for monitoring, detecting, and alerting on data drift in production datasets and database/data warehouse tables. It helps ensure data quality and model reliability by automatically profiling data, detecting unexpected changes, and notifying stakeholders via email and Slack. Driftmon also provides a dashboard for visualizing drift trends and data changes over time.
+
 
 ---
 
@@ -28,6 +33,7 @@ git clone https://github.com/Human-Gechi/data_drift_detector.git
 cd data_drift_detector
 pip install -e .
 ```
+To initialize dashbaord without entering interactive CLI, call **driftmon-dashboard** and streamlit dashbaord comes up
 
 ### 🛠️ CLI Commands
 | Command        | Description                                               |
@@ -40,6 +46,7 @@ pip install -e .
 |exit/quit       | exit CLI                                                  |
 
 ### ⚡️ Quick Start for CLI
+![alt text](image.png)
 1. Configure Your Connection & Alerts
 Set up your database/data warehouse connection and alerting preferences:
 ```bash
@@ -189,7 +196,8 @@ conn.connect()
 try:
     result = conn.get_group_data(datasets=dataset, table_names=tables)
     for key, df in result:
-        df.to_csv(f"{key}.csv", index=False)
+        print(key)
+        print(df)
 except Exception as e:
     print("Error:", e)
 
@@ -203,3 +211,44 @@ email = Email(
 )
 email.send_email()
 ```
+## 🤝 Contributing
+
+Contributions are welcome and appreciated!
+
+To contribute to Driftmon:
+
+1. **Fork the repository** on GitHub and clone your fork locally.
+2. **Create a new branch** for your feature or bugfix:
+   ```bash
+   git checkout -b feature/your-feature-name
+    ```
+3. Make your changes and add tests if applicable.
+4. Commit your changes with clear messages.
+5. Push your branch to your fork:
+    ```bash
+    git push origin feature/your-feature-name
+    ```
+6. Open a Pull Request on Github describing your changes
+
+Guidelines to follow when contributing to driftmon
+1. Please ensure your code follows the existing style and passes linting as indicated in the pyproject.toml file
+2. Add or update documentation as needed.
+3. Write tests for new features or bug fixes.
+4. Be respectful and constructive in code reviews and discussions.
+5. If you find a bug or have a feature request, please open an issue.
+
+Thank you for helping improve Driftmon!
+
+---
+
+#### 👤 Author
+
+**Ogechukwu Okoli**
+
+GitHub: [Human-Gechi](https://github.com/Human-Gechi)
+
+Email: okoliogechi74@gmail.com
+
+**Thank you for using Driftmon!
+If you have suggestions, questions, or want to contribute, feel free to reach out or open an issue.
+Stay ahead of data drift and keep your data pipelines reliable! 🚦📊**

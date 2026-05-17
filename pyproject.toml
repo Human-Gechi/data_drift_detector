@@ -1,7 +1,7 @@
 [project]
 name = "driftmon"
-version = "0.1.0"
-description = "Data drift detector for datasets, table datawhat"
+version = "0.1.1"
+description = "Data drift detector for data"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
@@ -28,7 +28,9 @@ dependencies = [
     "slack_sdk==3.41.0",
     "prompt_toolkit== 3.0.52",
     "typer==0.25.0",
-    "plotly==6.7.0"
+    "plotly==6.7.0",
+    "pyyaml==6.0.3",
+    "numpy==2.4.4"
 ]
 
 [project.optional-dependencies]

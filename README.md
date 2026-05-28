@@ -22,6 +22,54 @@
 
 ---
 
+```
+# Package Architecture
+
++----------------------+
+|   driftmon package   |
+|pip install driftmon  |
++----------+-----------+
+           |
+           v
++----------------------+
+|     Connectors       |
+| BigQuery / Snowflake |
+| MySQL / PostgreSQL   |
++----------+-----------+
+           |
+           v
++----------------------+
+| Baseline Profiling   |
+| save_profile()       |
+| stats / hashes       |
++----------+-----------+
+           |
+           v
++----------------------+
+|   monitoring.json    |
+| stored baseline data |
++----------+-----------+
+           |
+           v
++----------------------+
+|  Drift Detection     |
+| detect_drift()       |
+| compare baselines    |
++-----+---------+------+
+      |         |
+      |         v
+      |   +-------------+
+      |   | Alerts      |
+      |   | Email/Slack  |
+      |   +-------------+
+      |
+      v
++----------------------+
+|     Dashboard        |
+| Streamlit            |
+| change history       |
++----------------------+
+```
 ## 📦 Installation
 
 ```bash
@@ -51,6 +99,71 @@ To initialize dashbaord without entering interactive CLI, call **driftmon-dashbo
 Set up your database/data warehouse connection and alerting preferences:
 ```bash
 driftmon configure
+```
+CLI ARCHITECTURE
+```
+# CLI Architecture
+
++----------------------+
+|        User          |
++----------+-----------+
+           |
+           v
++----------------------+
+|      Driftmon CLI    |
+| configure            |
+| monitoring           |
+| detect-drift         |
+| dashboard            |
++----------+-----------+
+           |
+           v
++----------------------+
+|     params.yaml      |
+| CLI configuration    |
+| connector settings   |
+| alert settings       |
++----------+-----------+
+           |
+           v
++----------------------+
+|     Connector        |
+| BigQuery / Snowflake |
+| MySQL / PostgreSQL   |
++----------+-----------+
+           |
+           v
++----------------------+
+| Baseline Profiling   |
+| create profile       |
+| compute stats/hashes |
++----------+-----------+
+           |
+           v
++----------------------+
+|   monitoring.json    |
+| baseline storage     |
++----------+-----------+
+           |
+           v
++----------------------+
+|  Drift Detection     |
+| compare new data     |
+| detect changes       |
++-----+---------+------+
+      |         |
+      |         v
+      |   +-------------+
+      |   | Alerting    |
+      |   | Email/Slack  |
+      |   +-------------+
+      |
+      v
++----------------------+
+|     Dashboard        |
+| Streamlit UI         |
+| trends / drift time  |
++----------------------+
 ```
 You will be prompted for:
 

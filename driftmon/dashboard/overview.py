@@ -172,7 +172,7 @@ def plot_check_tables(records):
         )
 
         fig.update_layout(height=400, showlegend=True)
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, width="stretch", key="Tables plot")
 
 
 def main():

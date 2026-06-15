@@ -654,7 +654,7 @@ def plot_categorical_drift(
             height=300,
             hovermode="x unified",
         )
-        st.plotly_chart(fig2, use_container_width=True)
+        st.plotly_chart(fig2, width="stretch")
 
         if uniqueness_ratio_list:
             current_uniqueness = uniqueness_ratio_list[-1]

@@ -7,13 +7,13 @@
 
 ---
 
-## Overview
+## 1. Overview
 
 Driftmon monitors table snapshots over time, compares current data to historical baselines, and surfaces drift using statistical tests, hash comparisons, and interactive dashboard views. It supports multiple table types and column categories, with alerts and visualization for operational use.
 
 ---
 
-## Core Capabilities
+## 2. Core Capabilities
 
 - Baseline profiling for tables and columns
 - Historical monitoring and comparison of snapshots
@@ -25,7 +25,7 @@ Driftmon monitors table snapshots over time, compares current data to historical
 
 ---
 
-## How Driftmon Works
+## 3. How Driftmon Works
 
 1. A table snapshot is profiled and stored in `monitoring_history.jsonl`.
 2. Each new run adds a new record with hashes and per-column metrics.
@@ -35,18 +35,18 @@ Driftmon monitors table snapshots over time, compares current data to historical
 
 ---
 
-## Supported Column Categories and Classification
+## 4. Supported Column Categories and Classification
 
 Driftmon classifies columns using the `detected_type` field in the stored metrics.
 
-### 1) Numerical
+### 4.1 Numerical
 Used for continuous or discrete numeric columns.
 
 Typical metrics:
 - `bin_edges`
 - `expected_percents`
 
-### 2) Categorical
+### 4.2 Categorical
 Used for low-cardinality categorical columns.
 
 Typical metrics:
@@ -54,12 +54,12 @@ Typical metrics:
 - top category frequencies
 - category proportions
 
-### 3) Categorical High Cardinality
+### 4.3 Categorical High Cardinality
 Used for categorical-like columns with many distinct values.
 
 Handled similarly to categorical columns, but often with PSI-style comparison.
 
-### 4) Unstructured Text
+### 4.4 Unstructured Text
 Used for text-heavy fields where exact category frequencies are less useful.
 
 Typical metrics:
@@ -68,7 +68,7 @@ Typical metrics:
 - `unique_values`
 - `uniqueness_ratio`
 
-### 5) Date
+### 4.5 Date
 Used for date or timestamp-like columns.
 
 Typical metrics:
@@ -77,7 +77,7 @@ Typical metrics:
 - `count`
 - `null_counts`
 
-### 6) Boolean
+### 4.6 Boolean
 Used for true/false-like fields.
 
 Typical metrics:
@@ -85,14 +85,14 @@ Typical metrics:
 - `nulls`
 - `value_counts`
 
-### 7) Unknown / Unsupported
+### 4.7 Unknown / Unsupported
 Columns that do not match a supported `detected_type` are surfaced as unknown.
 
 ---
 
-## Statistical Tests and Drift Logic
+## 5. Statistical Tests and Drift Logic
 
-### Numerical Columns
+### 5.1 Numerical Columns
 **Metric used:** Population Stability Index (PSI)
 
 - PSI compares bucketed distributions between snapshots.
@@ -106,7 +106,7 @@ Columns that do not match a supported `detected_type` are surfaced as unknown.
 - PSI trend over time
 - Previous vs latest distribution comparison
 
-### Categorical Columns
+### 5.2 Categorical Columns
 **Metric used:** Jensen-Shannon Divergence (JSD) in the dashboard, and Pearson Chi-Square in detection logic
 
 - The dashboard computes JSD from category probability distributions.
@@ -114,20 +114,20 @@ Columns that do not match a supported `detected_type` are surfaced as unknown.
   - **Pearson Chi-Square test** for standard categorical columns
   - **PSI** for categorical high-cardinality columns
 
-### Unstructured Text Columns
+### 5.3 Unstructured Text Columns
 **Tests used:** Z-test for average text length, plus uniqueness-ratio comparison
 
 - Average character length is compared using a z-score-based test.
 - Uniqueness ratio is compared using an absolute threshold.
 - Drift is flagged when either signal changes meaningfully.
 
-### Boolean Columns
+### 5.4 Boolean Columns
 **Test used:** Two-sample proportions z-test
 
 - Compares the proportion of `True`/`False` values across snapshots.
 - Useful for detecting changes in binary distributions.
 
-### Date Columns
+### 5.5 Date Columns
 **Logic used:** Range shift / data completeness checks
 
 - Compares latest min/max date values against the previous snapshot.
@@ -137,7 +137,7 @@ Columns that do not match a supported `detected_type` are surfaced as unknown.
   - insufficient data / zero-epoch values
 - Also tracks completeness through null counts.
 
-### Hash-Based Change Detection
+### 5.6 Hash-Based Change Detection
 Before statistical comparison, Driftmon checks whether the latest table hash differs from the previous one.
 
 - If hashes match, drift is unlikely.
@@ -146,7 +146,7 @@ Before statistical comparison, Driftmon checks whether the latest table hash dif
 
 ---
 
-## Dashboard Views
+## 6. Dashboard Views
 
 The Streamlit dashboard provides:
 
@@ -160,7 +160,7 @@ The Streamlit dashboard provides:
 
 ---
 
-## Hash Retrieval Strategy and `mmap` Trade-offs
+## 7. Hash Retrieval Strategy and `mmap` Trade-offs
 
 Driftmon uses `mmap` when reading the latest hashes from the history file.
 
@@ -182,7 +182,7 @@ This approach is efficient for monitoring history files that grow over time, whe
 
 ---
 
-## Architecture
+## 8. Architecture
 ```
 +----------------------+
 |   driftmon package   |
@@ -231,7 +231,7 @@ This approach is efficient for monitoring history files that grow over time, whe
 ```
 ---
 
-## Installation
+## 9. Installation
 
 ```bash
 pip install driftmon
@@ -247,7 +247,7 @@ pip install -e .
 
 ---
 
-## CLI Commands
+## 10. CLI Commands
 
 | Command      | Description                                      |
 |--------------|--------------------------------------------------|
@@ -260,7 +260,7 @@ pip install -e .
 
 ---
 
-## Quick Start
+## 11. Quick Start
 
 ### CLI Preview
 ![Driftmon CLI preview](image.png)
@@ -287,7 +287,7 @@ driftmon dashboard
 
 ---
 
-## Supported Data Sources
+## 12. Supported Data Sources
 
 - Google BigQuery
 - Snowflake
@@ -296,7 +296,7 @@ driftmon dashboard
 
 ---
 
-## Example Usage
+## 13. Example Usage
 
 ### Using Context Managers
 
@@ -377,7 +377,7 @@ email.send_email()
 
 ---
 
-## Contributing
+## 14. Contributing
 
 Contributions are welcome.
 
@@ -389,7 +389,7 @@ Guidelines:
 
 ---
 
-## Author
+## 15. Author
 
 **Ogechukwu Okoli**
 
@@ -397,5 +397,5 @@ GitHub: [Human-Gechi](https://github.com/Human-Gechi)
 Email: okoliogechi74@gmail.com
 
 ---
-## Thank you for using Driftmon
+## 16. Thank you for using Driftmon
 Stay ahead of data drift and keep pipelines reliable.

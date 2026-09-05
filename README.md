@@ -10,6 +10,8 @@
 ## 1. Overview
 
 Driftmon monitors table snapshots over time, compares current data to historical baselines, and surfaces drift using statistical tests, hash comparisons, and interactive dashboard views. It supports multiple table types and column categories, with alerts and visualization for operational use.
+<img width="1905" height="897" alt="image" src="https://github.com/user-attachments/assets/60d78400-7c70-4b1b-8e69-e8f175218c21" />
+
 
 ---
 
@@ -143,8 +145,7 @@ Before statistical comparison, Driftmon checks whether the latest table hash dif
 - If hashes match, drift is unlikely.
 - If hashes differ, statistical drift analysis is performed.
 - The dashboard and detector use hash history to reduce unnecessary computation.
-
----
+<img width="1120" height="812" alt="image" src="https://github.com/user-attachments/assets/41eb8e88-0c9c-417e-a12b-b384fb86b07b" />
 
 ## 6. Dashboard Views
 
@@ -157,6 +158,15 @@ The Streamlit dashboard provides:
 - Boolean proportion charts
 - Timeline of monitoring runs
 - Raw metric inspection for each selected column
+<img width="1559" height="888" alt="image" src="https://github.com/user-attachments/assets/e2e737c2-c2af-45d4-955e-dde3073e0eea" />
+
+
+<img width="1920" height="921" alt="image" src="https://github.com/user-attachments/assets/f48e4940-0f82-4ce7-a4a8-a3ef0f1ad8ae" />
+
+
+<img width="1588" height="667" alt="image" src="https://github.com/user-attachments/assets/d8a49290-d155-489e-a8b7-f18dda326e42" />
+
+
 
 ---
 
